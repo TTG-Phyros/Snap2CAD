@@ -20,6 +20,7 @@ uv run --project worker python tools/check_env.py      # contrôle de l'environn
 uv run --project worker pytest worker                  # tests processeur
 uv run --project worker pytest worker -m gpu           # tests GPU (3060, 4060)
 uv run --project worker python tools/bench_vggt.py ... # mesures VRAM/temps (docs/benchmarks)
+uv run --project worker python -m tools.eval.poses     # erreur de rotation sur DTU / MobileBrick (docs/benchmarks/poses.json)
 ```
 
 Au premier chargement, VGGT est converti en bf16 dans `<magasin>/vggt-1b-bf16/` (≈ 2,5 Go, une seule fois).

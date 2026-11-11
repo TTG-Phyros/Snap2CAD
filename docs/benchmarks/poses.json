@@ -1,0 +1,255 @@
+[
+  {
+    "date": "2026-11-12",
+    "commit": "5ee21c9",
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "method": "vggt-1b bf16 (poses_init), alignement Umeyama sur les centres",
+    "n_views": 20,
+    "rotation_median_deg": {
+      "dtu": 0.353,
+      "mobilebrick": 1.07
+    },
+    "scenes": [
+      {
+        "scene": "dtu_scan1",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.369,
+          "mean": 0.39,
+          "max": 0.789
+        },
+        "center_mm_median": 2.23,
+        "focal_ratio_median": 1.0263,
+        "time_s": 22.06
+      },
+      {
+        "scene": "dtu_scan6",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.337,
+          "mean": 0.352,
+          "max": 0.774
+        },
+        "center_mm_median": 2.55,
+        "focal_ratio_median": 1.0124,
+        "time_s": 23.49
+      },
+      {
+        "scene": "mobilebrick_aston",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.604,
+          "mean": 0.69,
+          "max": 2.044
+        },
+        "center_mm_median": 4.69,
+        "focal_ratio_median": 1.0344,
+        "time_s": 21.31
+      },
+      {
+        "scene": "mobilebrick_audi",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.197,
+          "mean": 1.262,
+          "max": 1.777
+        },
+        "center_mm_median": 6.43,
+        "focal_ratio_median": 1.0039,
+        "time_s": 20.99
+      },
+      {
+        "scene": "mobilebrick_beetles",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.456,
+          "mean": 0.536,
+          "max": 1.226
+        },
+        "center_mm_median": 2.87,
+        "focal_ratio_median": 1.0285,
+        "time_s": 20.46
+      },
+      {
+        "scene": "mobilebrick_big_ben",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.266,
+          "mean": 1.358,
+          "max": 2.201
+        },
+        "center_mm_median": 5.61,
+        "focal_ratio_median": 1.014,
+        "time_s": 21.23
+      },
+      {
+        "scene": "mobilebrick_boat",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.869,
+          "mean": 0.926,
+          "max": 1.484
+        },
+        "center_mm_median": 5.25,
+        "focal_ratio_median": 1.0461,
+        "time_s": 21.02
+      },
+      {
+        "scene": "mobilebrick_bridge",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.668,
+          "mean": 1.654,
+          "max": 3.127
+        },
+        "center_mm_median": 5.44,
+        "focal_ratio_median": 1.0768,
+        "time_s": 20.8
+      },
+      {
+        "scene": "mobilebrick_cabin",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.066,
+          "mean": 1.001,
+          "max": 1.55
+        },
+        "center_mm_median": 4.16,
+        "focal_ratio_median": 1.0471,
+        "time_s": 21.44
+      },
+      {
+        "scene": "mobilebrick_camera",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.074,
+          "mean": 1.153,
+          "max": 1.915
+        },
+        "center_mm_median": 3.46,
+        "focal_ratio_median": 1.0246,
+        "time_s": 21.4
+      },
+      {
+        "scene": "mobilebrick_castle",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 5.227,
+          "mean": 5.178,
+          "max": 5.865
+        },
+        "center_mm_median": 13.06,
+        "focal_ratio_median": 1.0179,
+        "time_s": 24.62
+      },
+      {
+        "scene": "mobilebrick_colosseum",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.464,
+          "mean": 0.525,
+          "max": 1.008
+        },
+        "center_mm_median": 4.6,
+        "focal_ratio_median": 1.0117,
+        "time_s": 24.8
+      },
+      {
+        "scene": "mobilebrick_convertible",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 2.374,
+          "mean": 2.4,
+          "max": 3.389
+        },
+        "center_mm_median": 8.12,
+        "focal_ratio_median": 1.0635,
+        "time_s": 24.76
+      },
+      {
+        "scene": "mobilebrick_ferrari",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.536,
+          "mean": 1.479,
+          "max": 2.065
+        },
+        "center_mm_median": 5.81,
+        "focal_ratio_median": 1.0549,
+        "time_s": 25.65
+      },
+      {
+        "scene": "mobilebrick_jeep",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.802,
+          "mean": 0.795,
+          "max": 1.116
+        },
+        "center_mm_median": 3.54,
+        "focal_ratio_median": 1.005,
+        "time_s": 33.03
+      },
+      {
+        "scene": "mobilebrick_london_bus",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.629,
+          "mean": 0.655,
+          "max": 1.067
+        },
+        "center_mm_median": 4.63,
+        "focal_ratio_median": 1.0221,
+        "time_s": 31.15
+      },
+      {
+        "scene": "mobilebrick_motorcycle",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.5,
+          "mean": 1.603,
+          "max": 2.373
+        },
+        "center_mm_median": 5.34,
+        "focal_ratio_median": 1.0313,
+        "time_s": 25.52
+      },
+      {
+        "scene": "mobilebrick_porsche",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.973,
+          "mean": 0.97,
+          "max": 1.774
+        },
+        "center_mm_median": 6.0,
+        "focal_ratio_median": 1.0556,
+        "time_s": 25.03
+      },
+      {
+        "scene": "mobilebrick_satellite",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.776,
+          "mean": 0.861,
+          "max": 1.394
+        },
+        "center_mm_median": 4.64,
+        "focal_ratio_median": 1.0357,
+        "time_s": 25.8
+      },
+      {
+        "scene": "mobilebrick_space_shuttle",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.505,
+          "mean": 1.414,
+          "max": 1.897
+        },
+        "center_mm_median": 7.65,
+        "focal_ratio_median": 1.0471,
+        "time_s": 24.92
+      }
+    ]
+  }
+]
