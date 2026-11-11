@@ -655,6 +655,7 @@ dependencies = [
     { name = "torchvision", version = "0.22.1", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'" },
     { name = "torchvision", version = "0.22.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "torchvision", version = "0.22.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
+    { name = "trimesh" },
     { name = "vggt" },
 ]
 
@@ -675,6 +676,7 @@ requires-dist = [
     { name = "torch", marker = "sys_platform == 'darwin'", specifier = "==2.7.*" },
     { name = "torchvision", marker = "sys_platform != 'darwin'", specifier = "==0.22.*", index = "https://download.pytorch.org/whl/cu128" },
     { name = "torchvision", marker = "sys_platform == 'darwin'", specifier = "==0.22.*" },
+    { name = "trimesh", specifier = ">=5.2.0" },
     { name = "vggt", editable = "../third_party/vggt" },
 ]
 
@@ -814,6 +816,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0d/ea/b2a5bd54b28a324dae8211928b2d730b6547500342c7e6c6dea08bd0a485/tqdm-4.70.1.tar.gz", hash = "sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4", size = 171846, upload-time = "2026-09-11T07:25:16.601Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl", hash = "sha256:c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73", size = 80199, upload-time = "2026-09-11T07:25:14.599Z" },
+]
+
+[[package]]
+name = "trimesh"
+version = "5.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/77/8a/0798e6cd28e2d1c6a7dfc97ba8eb27f7da5f392a5c81147d4f1e41ce0c1b/trimesh-5.2.0.tar.gz", hash = "sha256:d0a845d058e5a4ff145d0f0082d80c58d761687ce389c79d422dbe774966957b", size = 880133, upload-time = "2026-10-24T01:10:30.021Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/14/78624d9c89bab76c2a2e1e839c7641fa686828c2c1c8fb64aedf3b371a5d/trimesh-5.2.0-py3-none-any.whl", hash = "sha256:04db2c7ec62afdd7763fb04c82bb5f257ddd984993a19ee83697f475fc58fd29", size = 751459, upload-time = "2026-10-24T01:10:27.874Z" },
 ]
 
 [[package]]
