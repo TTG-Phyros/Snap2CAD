@@ -33,6 +33,7 @@ explicit = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".."]  # tools/eval (adaptateurs DTU / MobileBrick, métriques)
 markers = ["gpu: nécessite un GPU (lancer avec -m gpu)"]
 addopts = "-m 'not gpu'"
 
@@ -43,3 +44,6 @@ target-version = "py311"
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["snap2cad", "tools"]
