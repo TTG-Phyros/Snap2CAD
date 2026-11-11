@@ -1,0 +1,34 @@
+# Données volumineuses (hors git)
+datasets/
+models/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+
+# Dépôts tiers clonés avec leurs poids — à intégrer dans third_party/ au jalon M0
+vggt/
+Hunyuan3D-2/
+cad-recode/
+
+# Projets Snap2CAD
+*.s2c/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Electron
+node_modules/
+dist/
+out/
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

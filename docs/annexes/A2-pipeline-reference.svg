@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 930" width="1680" height="930" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e5e5e5"/>
+    </marker>
+  </defs>
+  <rect width="1680" height="930" fill="#1c1c1e"/>
+
+  <text x="40" y="58" font-size="30" font-weight="700" fill="#f2f2f2">Mode Référence — pipeline v2</text>
+  <text x="40" y="88" font-size="15" fill="#a1a1a6">VGGT sur images entières · ajustement de faisceaux et échelle avant tout · reconstruction dense en pleine résolution</text>
+
+  <!-- Légende -->
+  <g font-size="13" fill="#d1d1d6">
+    <rect x="1100" y="40" width="14" height="14" rx="3" fill="#b9e3c6"/><text x="1120" y="52">Utilisateur</text>
+    <rect x="1210" y="40" width="14" height="14" rx="3" fill="#f2b880"/><text x="1230" y="52">GPU</text>
+    <rect x="1280" y="40" width="14" height="14" rx="3" fill="#a9c7f5"/><text x="1300" y="52">CPU</text>
+    <rect x="1350" y="40" width="14" height="14" rx="3" fill="#d9d9d9"/><text x="1370" y="52">Décision / données</text>
+    <rect x="1505" y="40" width="14" height="14" rx="3" fill="none" stroke="#8e8e93" stroke-dasharray="4 3"/><text x="1525" y="52">Repli / option</text>
+  </g>
+
+  <!-- Libellés de couloirs -->
+  <g font-size="13" font-weight="700" fill="#8e8e93" letter-spacing="1">
+    <text x="228" y="142">1 · ACQUISITION ET POSES (SANS ÉCHELLE)</text>
+    <text x="228" y="352">2 · GÉOMÉTRIE MÉTRIQUE (mm)</text>
+    <text x="228" y="740">3 · MAILLAGE, CONTRÔLE ET SORTIES</text>
+  </g>
+
+  <!-- Rangée 1 -->
+  <rect x="60" y="155" width="300" height="130" rx="12" fill="#b9e3c6"/>
+  <text x="78" y="189" font-size="17" font-weight="700" fill="#1c1c1e">Photos smartphone</text>
+  <g font-size="14" fill="#1c1c1e"><text x="78" y="217">15 à 40 photos, objectif 1×</text><text x="78" y="241">JPEG / HEIC</text><text x="78" y="265">+ pièce 2 € / 1 € ou carte ID-1</text></g>
+
+  <rect x="420" y="155" width="300" height="130" rx="12" fill="#a9c7f5"/>
+  <text x="438" y="189" font-size="17" font-weight="700" fill="#1c1c1e">Import et contrôles</text>
+  <g font-size="14" fill="#1c1c1e"><text x="438" y="217">EXIF → focale, objectif</text><text x="438" y="241">orientation, flou</text><text x="438" y="265">≥ 5 vues de la référence</text></g>
+
+  <rect x="780" y="155" width="300" height="130" rx="12" fill="#f2b880"/>
+  <text x="798" y="189" font-size="17" font-weight="700" fill="#1c1c1e">VGGT · bf16</text>
+  <g font-size="14" fill="#1c1c1e"><text x="798" y="217">images entières (518 px)</text><text x="798" y="241">→ poses, profondeur, confiance</text><text x="798" y="265">unités arbitraires</text></g>
+
+  <rect x="1140" y="155" width="300" height="130" rx="12" fill="#f2b880"/>
+  <rect x="1140" y="155" width="8" height="130" rx="4" fill="#b9e3c6"/>
+  <text x="1160" y="189" font-size="17" font-weight="700" fill="#1c1c1e">Détourage SAM 2.1</text>
+  <g font-size="14" fill="#1c1c1e"><text x="1160" y="217">clic objet + clic référence</text><text x="1160" y="241">propagation (repli guidé 3D)</text><text x="1160" y="265">repli automatique : BiRefNet</text></g>
+
+  <!-- Rangée 2 -->
+  <rect x="60" y="365" width="300" height="130" rx="12" fill="#a9c7f5"/>
+  <text x="78" y="399" font-size="17" font-weight="700" fill="#1c1c1e">Ajustement de faisceaux</text>
+  <g font-size="14" fill="#1c1c1e"><text x="78" y="427">pycolmap, pleine résolution</text><text x="78" y="451">ALIKED + SP, caméra partagée</text><text x="78" y="475">intrinsèques EXIF affinés</text></g>
+
+  <rect x="420" y="365" width="300" height="130" rx="12" fill="#a9c7f5"/>
+  <text x="438" y="399" font-size="17" font-weight="700" fill="#1c1c1e">Échelle et repère</text>
+  <g font-size="14" fill="#1c1c1e"><text x="438" y="427">ellipse / rectangle sous-pixel</text><text x="438" y="451">≥ 5 vues → facteur + σ</text><text x="438" y="475">plan de table, Z vers le haut</text></g>
+
+  <rect x="780" y="365" width="300" height="130" rx="12" fill="#f2b880"/>
+  <text x="798" y="399" font-size="17" font-weight="700" fill="#1c1c1e">Reconstruction dense</text>
+  <g font-size="14" fill="#1c1c1e"><text x="798" y="427">COLMAP PatchMatch (CUDA)</text><text x="798" y="451">OpenMVS sur Mac</text><text x="798" y="475">limitée au masque objet</text></g>
+
+  <polygon points="1290,355 1420,430 1290,505 1160,430" fill="#d9d9d9"/>
+  <text x="1290" y="420" font-size="16" font-weight="700" fill="#1c1c1e" text-anchor="middle">Couverture ?</text>
+  <g font-size="13" fill="#1c1c1e" text-anchor="middle"><text x="1290" y="442">≥ 3 vues · ≥ 15°</text><text x="1290" y="461">≥ 90 % de la surface</text></g>
+
+  <rect x="1470" y="365" width="190" height="130" rx="12" fill="#b9e3c6"/>
+  <text x="1486" y="399" font-size="17" font-weight="700" fill="#1c1c1e">Guidage</text>
+  <g font-size="13" fill="#1c1c1e"><text x="1486" y="425">zones manquantes</text><text x="1486" y="447">en rouge</text><text x="1486" y="469">+ vues suggérées</text></g>
+
+  <!-- Rangée 2,5 -->
+  <rect x="60" y="560" width="660" height="130" rx="12" fill="none" stroke="#3a3a3c" stroke-width="1.5"/>
+  <text x="78" y="590" font-size="15" font-weight="700" fill="#c7c7cc">Règles</text>
+  <g font-size="14" fill="#d1d1d6">
+    <text x="78" y="616">• Les zones « généré » ne servent jamais à une cote</text>
+    <text x="78" y="640">• Une seule étape GPU à la fois (sous-processus) · profil 6 Go : complétion désactivée</text>
+    <text x="78" y="664">• Tout est en mm après l'étape d'échelle · repère = plan de table</text>
+  </g>
+
+  <rect x="780" y="560" width="300" height="130" rx="12" fill="none" stroke="#8e8e93" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="798" y="594" font-size="17" font-weight="700" fill="#e5e5e5">Option : 2ᵉ session</text>
+  <g font-size="14" fill="#d1d1d6"><text x="798" y="622">objet retourné, même pipeline</text><text x="798" y="646">FPFH + RANSAC + ICP</text><text x="798" y="670">repli : alignement 3 points</text></g>
+
+  <rect x="1140" y="560" width="300" height="130" rx="12" fill="#d9d9d9"/>
+  <text x="1158" y="594" font-size="17" font-weight="700" fill="#1c1c1e">Nuage final</text>
+  <g font-size="14" fill="#1c1c1e"><text x="1158" y="622">chaque point étiqueté</text><text x="1158" y="646">mesuré / généré · session</text><text x="1158" y="670">confiance, nb de vues, angle</text></g>
+
+  <rect x="1470" y="560" width="190" height="130" rx="12" fill="none" stroke="#8e8e93" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="1486" y="594" font-size="17" font-weight="700" fill="#e5e5e5">Repli : complétion</text>
+  <g font-size="13" fill="#d1d1d6"><text x="1486" y="620">Hunyuan3D-2mv</text><text x="1486" y="642">ICP + échelle</text><text x="1486" y="664">→ « généré »</text></g>
+
+  <!-- Rangée 3 -->
+  <rect x="60" y="752" width="300" height="130" rx="12" fill="#a9c7f5"/>
+  <text x="78" y="786" font-size="17" font-weight="700" fill="#1c1c1e">Maillage</text>
+  <g font-size="14" fill="#1c1c1e"><text x="78" y="814">Poisson / ball-pivoting</text><text x="78" y="838">primitives sur zones noires</text><text x="78" y="862">attributs par sommet</text></g>
+
+  <rect x="420" y="752" width="300" height="130" rx="12" fill="#a9c7f5"/>
+  <text x="438" y="786" font-size="17" font-weight="700" fill="#1c1c1e">Incertitude</text>
+  <g font-size="14" fill="#1c1c1e"><text x="438" y="814">4 sources → σ en mm</text><text x="438" y="838">étalonnée sur les datasets</text><text x="438" y="862">« généré » : σ = ∞</text></g>
+
+  <rect x="780" y="752" width="300" height="130" rx="12" fill="#b9e3c6"/>
+  <text x="798" y="786" font-size="17" font-weight="700" fill="#1c1c1e">Cotes au pied à coulisse</text>
+  <g font-size="14" fill="#1c1c1e"><text x="798" y="814">1 cote : vérification</text><text x="798" y="838">≥ 2 : recalage + résidus</text><text x="798" y="862">point · cercle · plan</text></g>
+
+  <rect x="1140" y="752" width="300" height="130" rx="12" fill="#a9c7f5" stroke="#f0a35e" stroke-width="3"/>
+  <text x="1158" y="786" font-size="17" font-weight="700" fill="#1c1c1e">Exports</text>
+  <g font-size="14" fill="#1c1c1e"><text x="1158" y="814">STL · OBJ · PLY · GLB</text><text x="1158" y="838">STEP facetté</text><text x="1158" y="862">rapport JSON (cotes, σ, couverture)</text></g>
+
+  <!-- Flèches pleines -->
+  <g stroke="#e5e5e5" stroke-width="2" fill="none">
+    <line x1="360" y1="220" x2="416" y2="220" marker-end="url(#arr)"/>
+    <line x1="720" y1="220" x2="776" y2="220" marker-end="url(#arr)"/>
+    <line x1="1080" y1="220" x2="1136" y2="220" marker-end="url(#arr)"/>
+    <polyline points="1290,285 1290,318 210,318 210,361" marker-end="url(#arr)"/>
+    <line x1="360" y1="430" x2="416" y2="430" marker-end="url(#arr)"/>
+    <line x1="720" y1="430" x2="776" y2="430" marker-end="url(#arr)"/>
+    <line x1="1080" y1="430" x2="1156" y2="430" marker-end="url(#arr)"/>
+    <line x1="1420" y1="430" x2="1466" y2="430" marker-end="url(#arr)"/>
+    <line x1="1290" y1="505" x2="1290" y2="556" marker-end="url(#arr)"/>
+    <polyline points="1290,690 1290,712 210,712 210,748" marker-end="url(#arr)"/>
+    <line x1="360" y1="817" x2="416" y2="817" marker-end="url(#arr)"/>
+    <line x1="720" y1="817" x2="776" y2="817" marker-end="url(#arr)"/>
+    <line x1="1080" y1="817" x2="1136" y2="817" marker-end="url(#arr)"/>
+  </g>
+  <!-- Flèches pointillées -->
+  <g stroke="#a1a1a6" stroke-width="2" fill="none" stroke-dasharray="7 5">
+    <polyline points="1565,365 1565,112 210,112 210,151" marker-end="url(#arr)"/>
+    <line x1="1565" y1="495" x2="1565" y2="556" marker-end="url(#arr)"/>
+    <line x1="1470" y1="625" x2="1444" y2="625" marker-end="url(#arr)"/>
+    <line x1="1080" y1="625" x2="1136" y2="625" marker-end="url(#arr)"/>
+  </g>
+  <g font-size="13" fill="#d1d1d6">
+    <text x="1444" y="420" text-anchor="middle">non</text>
+    <text x="1300" y="536">oui</text>
+    <text x="900" y="106" text-anchor="middle">reprendre des photos (seules les étapes concernées sont relancées)</text>
+    <text x="1575" y="532">si impossible</text>
+  </g>
+</svg>
