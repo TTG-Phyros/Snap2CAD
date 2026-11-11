@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "models": {
+    "vggt-1b": {
+      "group": "reference",
+      "license": "VGGT-1B : non commercial",
+      "files": [
+        {
+          "path": "vggt-1b/model.safetensors",
+          "url": "https://huggingface.co/facebook/VGGT-1B/resolve/main/model.safetensors",
+          "size": 5026367224,
+          "sha256": "f164acf60724910d8fe1578bb499d800850c7bb0948db7555c413f9fbe60467e"
+        },
+        {
+          "path": "vggt-1b/config.json",
+          "url": "https://huggingface.co/facebook/VGGT-1B/resolve/main/config.json",
+          "size": 62,
+          "sha256": "a73e929a168b900546a84fe88cd70dfaaf2f8e39cf77355b12984eaa686f3855"
+        }
+      ]
+    },
+    "hunyuan3d-2mv-turbo": {
+      "group": "completion",
+      "license": "Tencent Hunyuan Community (hors UE, Royaume-Uni, Corée du Sud)",
+      "files": [
+        {
+          "path": "hunyuan3d-2mv-turbo/model.fp16.safetensors",
+          "url": "https://huggingface.co/tencent/Hunyuan3D-2mv/resolve/main/hunyuan3d-dit-v2-mv-turbo/model.fp16.safetensors",
+          "size": 4930777530,
+          "sha256": "172d7a989b99f66af760da0080d8c6f6350c72609536cf0c55b87a4afa574e45"
+        },
+        {
+          "path": "hunyuan3d-2mv-turbo/config.yaml",
+          "url": "https://huggingface.co/tencent/Hunyuan3D-2mv/resolve/main/hunyuan3d-dit-v2-mv-turbo/config.yaml",
+          "size": 1667,
+          "sha256": "4d9d7b21dd0669efd0a8da6024ecce28619b45a4ca5f3ea1394a54b3d38698f5"
+        }
+      ]
+    },
+    "cad-recode-v1.5": {
+      "group": "edit",
+      "license": "CAD-Recode : non commercial",
+      "files": [
+        {
+          "path": "cad-recode-v1.5/model.safetensors",
+          "url": "https://huggingface.co/filapro/cad-recode-v1.5/resolve/main/model.safetensors",
+          "size": 3087786824,
+          "sha256": "6fe6acab9baf5ce03cc529750ea0adba14d0e25df642d8642993952061a05d6c"
+        },
+        {
+          "path": "cad-recode-v1.5/config.json",
+          "url": "https://huggingface.co/filapro/cad-recode-v1.5/resolve/main/config.json",
+          "size": 700,
+          "sha256": "9124de6362ba82084d239d7596d881b8169f8e32976f0cc6302c7d98db4f5e5f"
+        }
+      ]
+    }
+  }
+}

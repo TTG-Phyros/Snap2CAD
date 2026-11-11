@@ -1,0 +1,104 @@
+[
+  {
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "memory_gib": 6.0,
+    "profile": "degraded",
+    "dataset": "kitchen",
+    "image_shape": [
+      350,
+      518
+    ],
+    "torch": "2.7.1+cu128",
+    "budget_mb": 5632,
+    "max_n_fitting": 25,
+    "rows": [
+      {
+        "n_images": 4,
+        "time_s": 1.16,
+        "peak_mb": 4010,
+        "fits": true
+      },
+      {
+        "n_images": 8,
+        "time_s": 4.33,
+        "peak_mb": 4936,
+        "fits": true
+      },
+      {
+        "n_images": 12,
+        "time_s": 6.98,
+        "peak_mb": 5070,
+        "fits": true
+      },
+      {
+        "n_images": 16,
+        "time_s": 10.03,
+        "peak_mb": 5219,
+        "fits": true
+      },
+      {
+        "n_images": 20,
+        "time_s": 14.72,
+        "peak_mb": 5351,
+        "fits": true
+      },
+      {
+        "n_images": 25,
+        "time_s": 26.4,
+        "peak_mb": 5535,
+        "fits": true
+      }
+    ]
+  },
+  {
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "memory_gib": 6.0,
+    "profile": "degraded",
+    "dataset": "dtu_scan1",
+    "image_shape": [
+      392,
+      518
+    ],
+    "torch": "2.7.1+cu128",
+    "budget_mb": 5632,
+    "max_n_fitting": 20,
+    "rows": [
+      {
+        "n_images": 4,
+        "time_s": 1.43,
+        "peak_mb": 4117,
+        "fits": true
+      },
+      {
+        "n_images": 8,
+        "time_s": 5.53,
+        "peak_mb": 5164,
+        "fits": true
+      },
+      {
+        "n_images": 12,
+        "time_s": 9.81,
+        "peak_mb": 5309,
+        "fits": true
+      },
+      {
+        "n_images": 16,
+        "time_s": 13.11,
+        "peak_mb": 5477,
+        "fits": true
+      },
+      {
+        "n_images": 20,
+        "time_s": 21.17,
+        "peak_mb": 5622,
+        "fits": true
+      },
+      {
+        "n_images": 24,
+        "time_s": 30.15,
+        "peak_mb": 5796,
+        "fits": false
+      }
+    ]
+  }
+]

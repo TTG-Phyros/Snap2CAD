@@ -1,15 +1,10 @@
 # Données volumineuses (hors git)
-datasets/
-models/
+/datasets/
+/models/
 *.safetensors
 *.ckpt
 *.pt
 *.pth
-
-# Dépôts tiers clonés avec leurs poids — à intégrer dans third_party/ au jalon M0
-vggt/
-Hunyuan3D-2/
-cad-recode/
 
 # Projets Snap2CAD
 *.s2c/

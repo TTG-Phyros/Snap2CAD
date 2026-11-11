@@ -1,0 +1,43 @@
+[project]
+name = "snap2cad"
+version = "0.1.0"
+description = "Worker Python de Snap2CAD : photos -> modèle 3D à l'échelle"
+requires-python = "==3.11.*"
+dependencies = [
+    "torch==2.7.*",
+    "torchvision==0.22.*",
+    "numpy==1.26.4",
+    "safetensors",
+    "pillow",
+    "vggt",
+]
+
+[dependency-groups]
+dev = ["pytest", "ruff", "mypy"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+vggt = { path = "../third_party/vggt", editable = true }
+torch = { index = "pytorch-cu128", marker = "sys_platform != 'darwin'" }
+torchvision = { index = "pytorch-cu128", marker = "sys_platform != 'darwin'" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["gpu: nécessite un GPU (lancer avec -m gpu)"]
+addopts = "-m 'not gpu'"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

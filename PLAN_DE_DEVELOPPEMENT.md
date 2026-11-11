@@ -1,7 +1,7 @@
 # Snap2CAD — Plan de développement
 
 > Version 1.0 — 11 novembre 2026
-> Statut : plan validé sur les décisions de cadrage, **aucun code écrit**.
+> Statut : plan validé sur les décisions de cadrage. **M0 en cours** : socle fait et mesuré sur la RTX 3060 Laptop, reste la RTX 4060.
 > Visuels : voir [Annexes](docs/annexes/ANNEXES.md) (architecture, pipeline, VRAM, données, jalons, validation).
 
 ---
@@ -379,7 +379,7 @@ Commits figés : VGGT `a288dd0`, Hunyuan3D-2 `f8db630`, CAD-Recode `03e3262`.
 | Hunyuan3D-2mv | fp16, FlashVDM | **désactivé** (ou déchargement processeur sur demande) | ≈ 6 Go |
 | CAD-Recode | bf16, sdpa | bf16, sdpa | ≈ 3,5 Go |
 
-N₈ et N₆ sont fixés au jalon M0 par mesure sur la RTX 4060 et la RTX 3060 Laptop.
+N₈ et N₆ sont fixés au jalon M0 par mesure sur la RTX 4060 et la RTX 3060 Laptop. **Mesuré : N₆ = 20** pour des photos 4:3 ([docs/benchmarks/M0-vggt.md](docs/benchmarks/M0-vggt.md)). N₈ reste à mesurer.
 
 ---
 
@@ -647,7 +647,7 @@ Aucune ne bloque le démarrage de M0.
 
 1. Hébergement du dépôt et intégration continue : GitHub (privé) ?
 2. Langue du code et des commentaires : anglais (proposé) ou français ?
-3. D'accord pour déplacer `vggt/`, `Hunyuan3D-2/` et `cad-recode/` dans `third_party/`, et les poids dans `models/`, au jalon M0 ?
+3. ~~D'accord pour déplacer `vggt/`, `Hunyuan3D-2/` et `cad-recode/` dans `third_party/`, et les poids dans `models/`, au jalon M0 ?~~ Fait en M0 (sous-modules git aux commits figés).
 4. Blender est-il déjà installé ? Il faut une version 4.x pour le jeu synthétique.
 5. Rythme visé (heures par semaine) pour transformer les tailles S/M/L en calendrier ?
 
