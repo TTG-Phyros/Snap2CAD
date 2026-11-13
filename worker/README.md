@@ -20,7 +20,15 @@ uv run --project worker python tools/check_env.py      # contrôle de l'environn
 uv run --project worker pytest worker                  # tests processeur
 uv run --project worker pytest worker -m gpu           # tests GPU (3060, 4060)
 uv run --project worker python tools/bench_vggt.py ... # mesures VRAM/temps (docs/benchmarks)
-uv run --project worker python -m tools.eval.poses     # erreur de rotation sur DTU / MobileBrick (docs/benchmarks/poses.json)
+uv run --project worker python -m tools.eval.poses     # erreur de rotation sur DTU / MobileBrick / synth:<série> (docs/benchmarks/poses.json)
 ```
 
 Au premier chargement, VGGT est converti en bf16 dans `<magasin>/vggt-1b-bf16/` (≈ 2,5 Go, une seule fois).
+
+## Jeu synthétique (M1b, projet uv séparé : Blender 4.2 en module `bpy`)
+
+```bash
+uv run --project tools/synth python tools/synth/fetch_gso.py               # 10 objets GSO → datasets/gso/
+uv run --project tools/synth python -m tools.synth.generate --skip-existing  # 10 objets × 3 variantes → datasets/synth/
+uv run --project tools/synth python -m tools.synth.generate Pony_C_Clamp_1440__flip  # une série
+```

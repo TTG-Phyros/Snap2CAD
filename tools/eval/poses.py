@@ -1,7 +1,7 @@
 """Critère M1 : erreur de rotation médiane de VGGT (poses_init) sur DTU et MobileBrick.
 
 Usage : uv run --project worker python -m tools.eval.poses [scène ...] [--n 20] [--work DOSSIER]
-Scènes : dtu:1, dtu:6, mobilebrick:aston, ... ; par défaut DTU 1 et 6 + les 18 séquences MobileBrick.
+Scènes : dtu:1, dtu:6, mobilebrick:aston, synth:<série>, ... ; par défaut DTU 1 et 6 + les 18 séquences MobileBrick.
 Résultats ajoutés dans docs/benchmarks/poses.json (référence pour l'ajustement de faisceaux, M3).
 """
 
@@ -25,11 +25,14 @@ from tools.eval import datasets, metrics
 ROOT = Path(__file__).resolve().parents[2]
 DTU = ROOT / "datasets/dtu/SampleSet"
 MOBILEBRICK = ROOT / "datasets/mobilebrick/test"
+SYNTH = ROOT / "datasets/synth"
 OUT = ROOT / "docs/benchmarks/poses.json"
 
 
 def load(spec: str) -> datasets.Scene:
     kind, arg = spec.split(":")
+    if kind == "synth":
+        return datasets.synth(SYNTH, arg)
     return datasets.dtu(DTU, int(arg)) if kind == "dtu" else datasets.mobilebrick(MOBILEBRICK, arg)
 
 
@@ -81,7 +84,7 @@ def main() -> None:
         kind: round(
             float(np.median([r["rotation_deg"]["median"] for r in rows if r["scene"].startswith(kind)])), 3
         )
-        for kind in ("dtu", "mobilebrick")
+        for kind in ("dtu", "mobilebrick", "synth")
         if any(r["scene"].startswith(kind) for r in rows)
     }
     print("médiane par dataset :", med)
