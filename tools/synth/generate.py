@@ -415,10 +415,11 @@ def generate(series: str, out_root: Path, samples: int) -> Path:
         blur = int(rng.integers(3, 13)) if rng.random() < 0.15 else 0
         sigma = float(rng.uniform(1.0, 3.0))
         quality = int(rng.integers(85, 96))
-        rgb = post.motion_blur(post.distort(rgb, K, k1), blur, rng.uniform(0, 180))
-        rgb = np.clip(rgb + rng.normal(0, sigma, rgb.shape), 0, 255).astype(np.uint8)
-        labels = post.distort(labels, K, k1, nearest=True)
-        depth = post.distort(depth, K, k1, nearest=True)
+        src = post.distortion_map(K, k1, H, W)  # une seule carte pour l'image, les labels et la profondeur
+        rgb = post.motion_blur(post.remap(rgb, src), blur, rng.uniform(0, 180))
+        rgb = np.clip(rgb + rng.normal(0, sigma, rgb.shape).astype(np.float32), 0, 255).astype(np.uint8)
+        labels = post.remap(labels, src, nearest=True)
+        depth = post.remap(depth, src, nearest=True)
         depth = np.where(labels > 0, np.clip(depth * 1000 * DEPTH_SCALE, 0, 65535), 0).astype(np.uint16)
 
         when = t0 + dt.timedelta(seconds=2 * i)
