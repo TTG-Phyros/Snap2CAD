@@ -7,3 +7,6 @@
 [submodule "third_party/cad-recode"]
 	path = third_party/cad-recode
 	url = https://github.com/filaPro/cad-recode.git
+[submodule "third_party/sam2"]
+	path = third_party/sam2
+	url = https://github.com/facebookresearch/sam2.git

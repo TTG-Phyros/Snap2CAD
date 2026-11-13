@@ -19,6 +19,30 @@
         }
       ]
     },
+    "sam2.1-hiera-large": {
+      "group": "reference",
+      "license": "SAM 2.1 : Apache-2.0",
+      "files": [
+        {
+          "path": "sam2.1-hiera-large/model.pt",
+          "url": "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt",
+          "size": 898083611,
+          "sha256": "2647878d5dfa5098f2f8649825738a9345572bae2d4350a2468587ece47dd318"
+        }
+      ]
+    },
+    "sam2.1-hiera-base-plus": {
+      "group": "reference",
+      "license": "SAM 2.1 : Apache-2.0",
+      "files": [
+        {
+          "path": "sam2.1-hiera-base-plus/model.pt",
+          "url": "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt",
+          "size": 323606802,
+          "sha256": "a2345aede8715ab1d5d31b4a509fb160c5a4af1970f199d9054ccfb746c004c5"
+        }
+      ]
+    },
     "hunyuan3d-2mv-turbo": {
       "group": "completion",
       "license": "Tencent Hunyuan Community (hors UE, Royaume-Uni, Corée du Sud)",
