@@ -13,6 +13,8 @@ dependencies = [
     "pillow-heif>=1.8.1",
     "trimesh>=5.2.0",
     "sam-2",
+    "pycolmap==3.11.*",
+    "lightglue",
 ]
 
 [dependency-groups]
@@ -27,6 +29,7 @@ vggt = { path = "../third_party/vggt", editable = true }
 sam-2 = { path = "../third_party/sam2", editable = true }
 torch = { index = "pytorch-cu128", marker = "sys_platform != 'darwin'" }
 torchvision = { index = "pytorch-cu128", marker = "sys_platform != 'darwin'" }
+lightglue = { git = "https://github.com/jytime/LightGlue", rev = "2f23ca2ea9638cecad7f7220795210fc6b8353c3" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
