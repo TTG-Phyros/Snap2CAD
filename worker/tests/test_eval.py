@@ -113,3 +113,15 @@ def test_dtu_adapter_projects_gt_points_into_images():
         uv = x[:, :2] / x[:, 2:]
         inside = ((uv >= 0) & (uv < [1600, 1200])).all(1).mean()
         assert inside > 0.8
+
+
+def test_inner_point_stays_inside_concave_mask():
+    from tools.eval.segment import inner_point
+
+    v, u = np.mgrid[0:400, 0:600]
+    r = np.hypot(u - 300, v - 200)
+    c_shape = (r < 180) & (r > 100) & ~((u > 300) & (abs(v - 200) < 40))  # anneau ouvert : centre hors masque
+    x, y = inner_point(c_shape)
+    assert c_shape[int(y), int(x)] and 120 < np.hypot(x - 300, y - 200) < 160
+    x, y = inner_point((abs(u - 300) < 200) & (abs(v - 200) < 40))
+    assert abs(y - 200) < 8
