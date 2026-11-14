@@ -78,6 +78,23 @@ def test_mobilebrick_adapter_and_project(tmp_path):
     assert gt["K"].shape == (3, 3, 3) and float(gt["geometry_to_mm"]) == 1000.0
 
 
+def test_synth_adapter(tmp_path):
+    d = tmp_path / "synth/obj__base"
+    (d / "images").mkdir(parents=True)
+    names = [f"view_{i:03d}.jpg" for i in range(4)]
+    for n in names:
+        Image.new("RGB", (32, 24)).save(d / "images" / n)
+    K = np.tile([[3000.0, 0, 2016], [0, 3000, 1512], [0, 0, 1]], (4, 1, 1))
+    np.savez(d / "cameras.npz", names=np.asarray(names), extrinsic=cameras(4), K=K, k1=np.zeros(4),
+             geometry="mesh.ply", geometry_to_mm=1.0)  # fmt: skip
+    scene = datasets.synth(tmp_path / "synth", "obj__base")
+    assert scene.name == "synth_obj__base" and scene.geometry == d / "mesh.ply"
+    datasets.write_project(scene, tmp_path / "p.s2c")
+    gt = datasets.read_gt(tmp_path / "p.s2c")
+    assert list(gt["names"]) == names
+    np.testing.assert_allclose(gt["extrinsic"], cameras(4))
+
+
 DTU = Path(__file__).resolve().parents[2] / "datasets/dtu/SampleSet"
 
 

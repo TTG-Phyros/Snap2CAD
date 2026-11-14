@@ -1,4 +1,4 @@
-"""Adaptateurs DTU et MobileBrick → format de vérité terrain Snap2CAD (plan §9.2, jalon M1).
+"""Adaptateurs DTU, MobileBrick et synthétique → format de vérité terrain Snap2CAD (plan §9.2, jalon M1).
 
 Format (dossier projet) :
 - `input/` : images de la série (lues par l'étape `import`) ;
@@ -76,6 +76,14 @@ def mobilebrick(root: Path, seq: str) -> Scene:
     c2w[:, :3, 3] *= 1000.0
     K = np.stack([np.loadtxt(d / "intrinsic" / f"{p.stem}.txt") for p in images])
     return Scene(f"mobilebrick_{seq}", images, K, np.linalg.inv(c2w), d / "mesh/gt_mesh.ply", 1000.0)
+
+
+def synth(root: Path, series: str) -> Scene:
+    """Jeu synthétique Snap2CAD (`tools/synth`) : déjà en OpenCV et en mm. k1 (≤ 0,015) ignoré ici."""
+    d = root / series
+    with np.load(d / "cameras.npz") as f:
+        names, w2c, K = [str(n) for n in f["names"]], f["extrinsic"], f["K"]
+    return Scene(f"synth_{series}", [d / "images" / n for n in names], K, _homog(w2c), d / "mesh.ply", 1.0)
 
 
 def write_project(scene: Scene, dest: Path, n: int | None = None) -> Path:

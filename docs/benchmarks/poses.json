@@ -251,5 +251,377 @@
         "time_s": 24.92
       }
     ]
+  },
+  {
+    "date": "2026-11-14",
+    "commit": "a5cc7f7",
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "method": "vggt-1b bf16 (poses_init), alignement Umeyama sur les centres",
+    "n_views": 20,
+    "rotation_median_deg": {
+      "synth": 1.152
+    },
+    "scenes": [
+      {
+        "scene": "synth_Cole_Hardware_Hammer_Black__base",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.563,
+          "mean": 1.564,
+          "max": 2.45
+        },
+        "center_mm_median": 12.08,
+        "focal_ratio_median": 1.1345,
+        "time_s": 22.72
+      },
+      {
+        "scene": "synth_Cole_Hardware_Hammer_Black__flip",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.978,
+          "mean": 1.165,
+          "max": 3.564
+        },
+        "center_mm_median": 7.38,
+        "focal_ratio_median": 1.0255,
+        "time_s": 23.77
+      },
+      {
+        "scene": "synth_Cole_Hardware_Hammer_Black__noir",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.488,
+          "mean": 1.663,
+          "max": 3.282
+        },
+        "center_mm_median": 12.31,
+        "focal_ratio_median": 1.1194,
+        "time_s": 21.34
+      },
+      {
+        "scene": "synth_Cole_Hardware_Mug_Classic_Blue__base",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.87,
+          "mean": 0.923,
+          "max": 1.618
+        },
+        "center_mm_median": 5.29,
+        "focal_ratio_median": 1.0427,
+        "time_s": 21.56
+      },
+      {
+        "scene": "synth_Cole_Hardware_Mug_Classic_Blue__noir",
+        "n_images": 18,
+        "rotation_deg": {
+          "median": 1.329,
+          "mean": 1.458,
+          "max": 3.27
+        },
+        "center_mm_median": 8.88,
+        "focal_ratio_median": 1.1029,
+        "time_s": 19.37
+      },
+      {
+        "scene": "synth_Cole_Hardware_Mug_Classic_Blue__noref",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.411,
+          "mean": 1.614,
+          "max": 3.49
+        },
+        "center_mm_median": 15.19,
+        "focal_ratio_median": 1.1219,
+        "time_s": 21.07
+      },
+      {
+        "scene": "synth_Ecoforms_Plant_Container_Quadra_Turquoise_QP12__base",
+        "n_images": 18,
+        "rotation_deg": {
+          "median": 0.959,
+          "mean": 0.907,
+          "max": 1.305
+        },
+        "center_mm_median": 14.08,
+        "focal_ratio_median": 1.0539,
+        "time_s": 19.6
+      },
+      {
+        "scene": "synth_Ecoforms_Plant_Container_Quadra_Turquoise_QP12__flip",
+        "n_images": 17,
+        "rotation_deg": {
+          "median": 1.037,
+          "mean": 1.111,
+          "max": 2.511
+        },
+        "center_mm_median": 9.97,
+        "focal_ratio_median": 1.1075,
+        "time_s": 18.49
+      },
+      {
+        "scene": "synth_Ecoforms_Plant_Container_Quadra_Turquoise_QP12__noir",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.809,
+          "mean": 0.858,
+          "max": 1.487
+        },
+        "center_mm_median": 7.87,
+        "focal_ratio_median": 1.018,
+        "time_s": 21.11
+      },
+      {
+        "scene": "synth_Logitech_Ultimate_Ears_Boom_Wireless_Speaker_Night_Black__base",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.91,
+          "mean": 0.833,
+          "max": 1.265
+        },
+        "center_mm_median": 5.66,
+        "focal_ratio_median": 1.0376,
+        "time_s": 21.02
+      },
+      {
+        "scene": "synth_Logitech_Ultimate_Ears_Boom_Wireless_Speaker_Night_Black__noir",
+        "n_images": 16,
+        "rotation_deg": {
+          "median": 0.85,
+          "mean": 0.972,
+          "max": 2.043
+        },
+        "center_mm_median": 7.57,
+        "focal_ratio_median": 1.0253,
+        "time_s": 19.95
+      },
+      {
+        "scene": "synth_Logitech_Ultimate_Ears_Boom_Wireless_Speaker_Night_Black__noref",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.381,
+          "mean": 1.834,
+          "max": 6.75
+        },
+        "center_mm_median": 16.16,
+        "focal_ratio_median": 1.0996,
+        "time_s": 21.47
+      },
+      {
+        "scene": "synth_Markings_Desk_Caddy__base",
+        "n_images": 17,
+        "rotation_deg": {
+          "median": 0.889,
+          "mean": 0.996,
+          "max": 1.803
+        },
+        "center_mm_median": 6.99,
+        "focal_ratio_median": 1.0498,
+        "time_s": 18.47
+      },
+      {
+        "scene": "synth_Markings_Desk_Caddy__incomplete",
+        "n_images": 18,
+        "rotation_deg": {
+          "median": 1.054,
+          "mean": 0.971,
+          "max": 1.408
+        },
+        "center_mm_median": 5.31,
+        "focal_ratio_median": 1.0413,
+        "time_s": 19.3
+      },
+      {
+        "scene": "synth_Markings_Desk_Caddy__noir",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.624,
+          "mean": 0.645,
+          "max": 1.252
+        },
+        "center_mm_median": 4.62,
+        "focal_ratio_median": 1.029,
+        "time_s": 21.38
+      },
+      {
+        "scene": "synth_OXO_Soft_Works_Can_Opener_SnapLock__base",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.439,
+          "mean": 1.502,
+          "max": 2.324
+        },
+        "center_mm_median": 10.59,
+        "focal_ratio_median": 1.0786,
+        "time_s": 21.38
+      },
+      {
+        "scene": "synth_OXO_Soft_Works_Can_Opener_SnapLock__noir",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.604,
+          "mean": 1.687,
+          "max": 2.624
+        },
+        "center_mm_median": 8.76,
+        "focal_ratio_median": 1.107,
+        "time_s": 21.24
+      },
+      {
+        "scene": "synth_OXO_Soft_Works_Can_Opener_SnapLock__noref",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.15,
+          "mean": 1.485,
+          "max": 3.784
+        },
+        "center_mm_median": 9.13,
+        "focal_ratio_median": 1.063,
+        "time_s": 21.58
+      },
+      {
+        "scene": "synth_Pony_C_Clamp_1440__base",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 0.956,
+          "mean": 1.027,
+          "max": 2.12
+        },
+        "center_mm_median": 8.66,
+        "focal_ratio_median": 1.0437,
+        "time_s": 21.53
+      },
+      {
+        "scene": "synth_Pony_C_Clamp_1440__incomplete",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 2.178,
+          "mean": 2.276,
+          "max": 3.628
+        },
+        "center_mm_median": 14.19,
+        "focal_ratio_median": 1.1045,
+        "time_s": 21.54
+      },
+      {
+        "scene": "synth_Pony_C_Clamp_1440__noir",
+        "n_images": 19,
+        "rotation_deg": {
+          "median": 1.455,
+          "mean": 1.629,
+          "max": 2.615
+        },
+        "center_mm_median": 11.67,
+        "focal_ratio_median": 1.0826,
+        "time_s": 20.41
+      },
+      {
+        "scene": "synth_Razer_Taipan_Black_Ambidextrous_Gaming_Mouse__base",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.586,
+          "mean": 1.47,
+          "max": 2.539
+        },
+        "center_mm_median": 6.54,
+        "focal_ratio_median": 1.074,
+        "time_s": 21.56
+      },
+      {
+        "scene": "synth_Razer_Taipan_Black_Ambidextrous_Gaming_Mouse__flip",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.403,
+          "mean": 1.37,
+          "max": 2.525
+        },
+        "center_mm_median": 6.63,
+        "focal_ratio_median": 1.0389,
+        "time_s": 21.45
+      },
+      {
+        "scene": "synth_Razer_Taipan_Black_Ambidextrous_Gaming_Mouse__noir",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.362,
+          "mean": 1.541,
+          "max": 3.582
+        },
+        "center_mm_median": 8.53,
+        "focal_ratio_median": 1.1473,
+        "time_s": 21.44
+      },
+      {
+        "scene": "synth_Shurtape_Gaffers_Tape_Silver_2_x_60_yd__base",
+        "n_images": 18,
+        "rotation_deg": {
+          "median": 1.151,
+          "mean": 1.193,
+          "max": 1.92
+        },
+        "center_mm_median": 7.33,
+        "focal_ratio_median": 1.0928,
+        "time_s": 19.5
+      },
+      {
+        "scene": "synth_Shurtape_Gaffers_Tape_Silver_2_x_60_yd__incomplete",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.396,
+          "mean": 1.405,
+          "max": 3.276
+        },
+        "center_mm_median": 6.11,
+        "focal_ratio_median": 1.1251,
+        "time_s": 21.48
+      },
+      {
+        "scene": "synth_Shurtape_Gaffers_Tape_Silver_2_x_60_yd__noir",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.915,
+          "mean": 1.991,
+          "max": 4.252
+        },
+        "center_mm_median": 7.91,
+        "focal_ratio_median": 1.1487,
+        "time_s": 21.68
+      },
+      {
+        "scene": "synth_Threshold_Porcelain_Teapot_White__base",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.154,
+          "mean": 1.188,
+          "max": 2.326
+        },
+        "center_mm_median": 11.59,
+        "focal_ratio_median": 1.1153,
+        "time_s": 21.47
+      },
+      {
+        "scene": "synth_Threshold_Porcelain_Teapot_White__incomplete",
+        "n_images": 20,
+        "rotation_deg": {
+          "median": 1.09,
+          "mean": 1.192,
+          "max": 1.983
+        },
+        "center_mm_median": 9.4,
+        "focal_ratio_median": 1.0681,
+        "time_s": 21.57
+      },
+      {
+        "scene": "synth_Threshold_Porcelain_Teapot_White__noir",
+        "n_images": 18,
+        "rotation_deg": {
+          "median": 0.929,
+          "mean": 1.046,
+          "max": 1.938
+        },
+        "center_mm_median": 7.16,
+        "focal_ratio_median": 1.0425,
+        "time_s": 19.61
+      }
+    ]
   }
 ]
