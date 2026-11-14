@@ -4,6 +4,10 @@ Les photos sont ordonnées par heure de prise de vue (EXIF) : la propagation sui
 Les clics (pixels de `images/`, origine au coin haut gauche) sont normalement sur la 1ʳᵉ photo, mais
 peuvent porter sur n'importe laquelle : la propagation part de la première photo cliquée vers la fin,
 puis revient vers le début.
+
+Repli guidé en 3D (risque R3, vues très espacées) : le masque des photos cliquées est remonté en 3D avec la
+profondeur VGGT (`poses_init`), puis reprojeté dans chaque photo. Si la boîte reprojetée et celle du masque
+propagé ne se recouvrent pas assez, SAM refait la photo en mode image avec la boîte reprojetée.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
+from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 from snap2cad import device
 from snap2cad.models import manifest
@@ -37,7 +42,11 @@ PARAMS: dict[str, Any] = {
     "clicks": {},
     "min_area_ratio": 1e-4,  # masque plus petit que cette part de l'image : cible absente de la photo
     "min_reference_views": 5,  # plan §1 : référence visible sur au moins 5 photos
+    "fallback_box_iou": 0.5,  # en dessous : masque propagé jugé perdu, repli sur la boîte reprojetée
+    "box_margin": 0.1,  # marge ajoutée à la boîte reprojetée (part de sa taille)
+    "depth_tolerance": 0.03,  # point caché s'il est plus loin que la profondeur VGGT de plus de 3 %
 }
+Box = tuple[float, float, float, float]  # x0, y0, x1, y1 en pixels de la photo
 
 
 def frame_order(exif: dict[str, Any]) -> list[dict[str, Any]]:
@@ -45,6 +54,72 @@ def frame_order(exif: dict[str, Any]) -> list[dict[str, Any]]:
     kept = [e for e in exif["images"] if e["status"] != "rejected"]
     # "AAAA:MM:JJ HH:MM:SS.fraction" : l'ordre lexicographique est l'ordre chronologique.
     return sorted(kept, key=lambda e: (e["datetime"] is None, e["datetime"] or "", e["file"]))
+
+
+def lift(mask: np.ndarray, pred: dict[str, np.ndarray], k: int) -> np.ndarray:
+    """Points 3D (repère VGGT) des pixels de `mask` (photo pleine résolution) dans la vue VGGT `k`.
+
+    On garde la moitié la plus confiante de la profondeur sous le masque.
+    """
+    depth, conf, K = pred["depth"][k], pred["depth_conf"][k], pred["intrinsic"][k]
+    sx, sy, tx, ty = pred["affine"][k]
+    v, u = np.mgrid[0 : depth.shape[0], 0 : depth.shape[1]] + 0.5  # centres des pixels VGGT
+    U, V = np.floor((u - tx) / sx).astype(int), np.floor((v - ty) / sy).astype(int)
+    sel = (U >= 0) & (U < mask.shape[1]) & (V >= 0) & (V < mask.shape[0])  # hors complément blanc
+    sel[sel] = mask[V[sel], U[sel]]
+    if not sel.any():
+        return np.zeros((0, 3))
+    sel &= conf >= np.median(conf[sel])
+    xc = np.linalg.solve(K, np.stack([u[sel], v[sel], np.ones(sel.sum())])) * depth[sel]
+    R, t = pred["extrinsic"][k][:, :3], pred["extrinsic"][k][:, 3]
+    return (xc - t[:, None]).T @ R  # Rᵀ·(x_cam − t)
+
+
+def guide_box(
+    X: np.ndarray,
+    pred: dict[str, np.ndarray],
+    k: int,
+    hw: tuple[int, int],
+    p: dict[str, Any],
+    occlusion: bool,
+) -> Box | None:
+    """Boîte de la projection de `X` dans la photo `k` ; None si la cible n'y est pas (ou cachée)."""
+    R, t, K = pred["extrinsic"][k][:, :3], pred["extrinsic"][k][:, 3], pred["intrinsic"][k]
+    xc = X @ R.T + t
+    z = xc[:, 2]
+    uv = (xc @ K.T)[:, :2] / np.where(z > 0, z, np.inf)[:, None]
+    sx, sy, tx, ty = pred["affine"][k]
+    full = (uv - [tx, ty]) / [sx, sy]
+    keep = (z > 0) & (full[:, 0] >= 0) & (full[:, 0] < hw[1]) & (full[:, 1] >= 0) & (full[:, 1] < hw[0])
+    if occlusion:
+        # La référence, à plat sur la table, peut être cachée par l'objet. Pas l'objet : ses points vus
+        # depuis la photo cliquée sont souvent derrière sa propre face avant, sans qu'il soit caché.
+        d = pred["depth"][k]
+        i = np.clip(uv[:, 1].astype(int), 0, d.shape[0] - 1)
+        j = np.clip(uv[:, 0].astype(int), 0, d.shape[1] - 1)
+        keep &= z <= d[i, j] * (1 + p["depth_tolerance"])
+    if keep.sum() < max(10, 0.2 * len(X)):
+        return None
+    lo, hi = np.percentile(full[keep], 2, axis=0), np.percentile(full[keep], 98, axis=0)
+    pad = p["box_margin"] * (hi - lo)
+    lo, hi = np.maximum(lo - pad, 0), np.minimum(hi + pad, [hw[1], hw[0]])
+    return float(lo[0]), float(lo[1]), float(hi[0]), float(hi[1])
+
+
+def mask_box(m: np.ndarray) -> Box | None:
+    rows, cols = np.flatnonzero(m.any(1)), np.flatnonzero(m.any(0))
+    if not len(rows):
+        return None
+    return float(cols[0]), float(rows[0]), float(cols[-1] + 1), float(rows[-1] + 1)
+
+
+def box_iou(a: Box | None, b: Box) -> float:
+    if a is None:
+        return 0.0
+    w = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    h = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - w * h
+    return w * h / union
 
 
 def run(
@@ -62,6 +137,8 @@ def run(
     index = {Path(e["file"]).name: i for i, e in enumerate(frames)}
     if unknown := {c["image"] for cs in p["clicks"].values() for c in cs} - index.keys():
         raise ValueError(f"Clic sur une photo absente de la série : {', '.join(sorted(unknown))}")
+    if not (root / "vggt/predictions.npz").is_file():
+        raise RuntimeError("Lancer l'étape poses_init avant segment (repli guidé en 3D).")
 
     info = info or device.detect()
     if info.profile == "unsupported":
@@ -69,13 +146,13 @@ def run(
     p["model"] = p["model"] or sam_model.MODELS[info.profile][0]
     model_sha = manifest()[p["model"]]["files"][0]["sha256"]
     versions = {"snap2cad": version("snap2cad"), "sam2": version("sam-2"), "model": model_sha}
-    key = project.inputs_hash(["images", "exif.json"], p, versions)
+    key = project.inputs_hash(["images", "exif.json", "vggt/predictions.npz"], p, versions)
     if not project.needs_run(STEP, key):
         return project.data["steps"][STEP]
 
     t0 = time.perf_counter()
     targets = {t: TARGETS[t] for t in TARGETS if p["clicks"].get(t)}
-    masks: dict[str, list[np.ndarray | None]] = {t: [None] * len(frames) for t in targets}
+    masks: dict[str, dict[int, np.ndarray]] = {t: {} for t in targets}  # n° de photo → masque
     predictor = sam_model.load(p["model"], info)
     device.reset_peak_memory(info)
     with tempfile.TemporaryDirectory() as tmp, torch.inference_mode(), device.autocast(info):
@@ -83,7 +160,7 @@ def run(
             shutil.copyfile(root / e["file"], Path(tmp) / f"{i:05d}.jpg")
         # Trames et état sur le processeur : la VRAM ne dépend pas du nombre de photos.
         state = predictor.init_state(tmp, offload_video_to_cpu=True, offload_state_to_cpu=True)
-        clicked = []
+        clicked: dict[str, list[int]] = {}
         for target, obj_id in targets.items():
             by_frame = defaultdict(list)
             for c in p["clicks"][target]:
@@ -99,19 +176,38 @@ def run(
                     # Photos de tailles différentes : SAM normaliserait par une seule, on le fait par photo.
                     normalize_coords=False,
                 )
-                clicked.append(i)
+            clicked[target] = list(by_frame)
         names = {v: k for k, v in targets.items()}
         for reverse in (False, True):
             for i, obj_ids, logits in predictor.propagate_in_video(
-                state, start_frame_idx=min(clicked), reverse=reverse
+                state, start_frame_idx=min(i for cs in clicked.values() for i in cs), reverse=reverse
             ):
                 hw = (frames[i]["height"], frames[i]["width"])
                 if tuple(logits.shape[-2:]) != hw:  # SAM ramène tout à la taille d'une seule photo
                     logits = F.interpolate(logits.float(), hw, mode="bilinear", align_corners=False)
                 for obj_id, m in zip(obj_ids, (logits[:, 0] > 0).cpu().numpy(), strict=True):
                     masks[names[obj_id]][i] = m
+
+        with np.load(root / "vggt/predictions.npz") as f:
+            pred = {k: f[k] for k in ("names", "extrinsic", "intrinsic", "depth", "depth_conf", "affine")}
+        vi = {str(n): k for k, n in enumerate(pred["names"])}
+        image_predictor = SAM2ImagePredictor(predictor)  # même modèle, en mode image
+        fallback: dict[str, list[str]] = {}
+        for target in targets:
+            ms = masks[target]
+            X = np.concatenate([lift(ms[i], pred, vi[Path(frames[i]["file"]).name]) for i in clicked[target]])
+            fallback[target] = []
+            for i, e in enumerate(frames):
+                hw = (e["height"], e["width"])
+                box = guide_box(X, pred, vi[Path(e["file"]).name], hw, p, occlusion=target == "reference")
+                if box is None or box_iou(mask_box(ms[i]), box) >= p["fallback_box_iou"]:
+                    continue
+                image_predictor.set_image(np.asarray(Image.open(root / e["file"]).convert("RGB")))
+                out, _, _ = image_predictor.predict(box=np.array(box), multimask_output=False)
+                ms[i] = out[0] > 0
+                fallback[target].append(Path(e["file"]).name)
     peak = device.peak_memory_mb(info)
-    del predictor, state
+    del predictor, state, image_predictor
 
     shutil.rmtree(root / "masks", ignore_errors=True)
     outputs: list[str] = []
@@ -120,8 +216,9 @@ def run(
     for target, ms in masks.items():
         (root / "masks" / target).mkdir(parents=True)
         area[target] = []
-        for e, m in zip(frames, ms, strict=True):
-            assert m is not None
+        assert len(ms) == len(frames)  # propagation avant + arrière : toutes les photos
+        for i, e in enumerate(frames):
+            m = ms[i]
             rel = f"masks/{target}/{Path(e['file']).stem}.png"
             Image.fromarray(m.astype(np.uint8) * 255).save(root / rel)
             outputs.append(rel)
@@ -159,6 +256,11 @@ def run(
         device=info.name,
         duration_s=round(time.perf_counter() - t0, 2),
         peak_vram_mb=round(peak) if peak else None,
-        result={"order": [Path(e["file"]).name for e in frames], "area_ratio": area, "checks": checks},
+        result={
+            "order": [Path(e["file"]).name for e in frames],
+            "area_ratio": area,
+            "fallback_3d": fallback,
+            "checks": checks,
+        },
     )
     return project.data["steps"][STEP]

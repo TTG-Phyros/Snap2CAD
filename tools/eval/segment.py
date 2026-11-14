@@ -27,7 +27,7 @@ from snap2cad import device
 from snap2cad.models import models_dir
 from snap2cad.models import sam as sam_model
 from snap2cad.project import Project
-from snap2cad.steps import import_, segment
+from snap2cad.steps import import_, poses_init, segment
 from tools.eval import datasets
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -85,6 +85,10 @@ def evaluate(
     datasets.write_project(scene, root, n)
     project = Project(root)
     import_.run(project)
+    predictor.model.cpu()  # VGGT prend presque toute la VRAM sur 6 Go
+    torch.cuda.empty_cache()
+    poses_init.run(project, info)
+    predictor.model.to(info.device)
     frames = segment.frame_order(json.loads((root / "exif.json").read_text("utf-8")))
     stems = [Path(e["file"]).stem for e in frames]
     gt = {s: np.asarray(Image.open(SYNTH / series / "labels" / f"{s}.png")) for s in stems}
@@ -109,6 +113,7 @@ def evaluate(
         out[target] = {
             "views": len(v),
             "clicks": len(tc),
+            "fallback_3d": len(rec["result"]["fallback_3d"][target]),
             "clicked_iou": round(scores[tc[0]["image"][:-4]], 4),
             "iou_mean": round(float(v.mean()), 4),
             "iou_min": round(float(v.min()), 4),
@@ -134,7 +139,7 @@ def main() -> None:
         print(
             f"{s:40s}"
             + "".join(
-                f"  {t} {r[t]['clicks']} clic(s) IoU cliquée {r[t]['clicked_iou']:.3f} "
+                f"  {t} {r[t]['clicks']} clic(s) repli {r[t]['fallback_3d']} IoU cliquée {r[t]['clicked_iou']:.3f} "
                 f"moy {r[t]['iou_mean']:.3f} min {r[t]['iou_min']:.3f} perdues {len(r[t]['lost'])}"
                 for t in LABELS
                 if t in r
@@ -157,7 +162,7 @@ def main() -> None:
         "date": time.strftime("%Y-%m-%d"),
         "commit": commit.stdout.strip(),
         "gpu": info.name,
-        "method": f"SAM 2.1 vidéo (segment, {name}), clics simulés sur la 1re vue (≤ {MAX_CLICKS}, IoU ≥ {CLICK_IOU})",
+        "method": f"SAM 2.1 vidéo + repli 3D VGGT (segment, {name}), clics simulés sur la 1re vue (≤ {MAX_CLICKS}, IoU ≥ {CLICK_IOU})",
         "n_views": a.n,
         "summary": summary,
         "series": rows,
