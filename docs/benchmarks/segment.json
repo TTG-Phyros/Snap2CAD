@@ -795,5 +795,1293 @@
         }
       }
     ]
+  },
+  {
+    "date": "2026-11-14",
+    "commit": "f8b7f3c",
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "method": "SAM 2.1 vidéo (segment, sam2.1-hiera-base-plus), clics simulés sur la 1re vue (≤ 5, IoU ≥ 0.95), puis correction des vues sous IoU 0.8 (≤ 3 par cible)",
+    "n_views": 20,
+    "summary": {
+      "object": {
+        "iou_mean": 0.9817,
+        "series_iou_090": 30,
+        "series_lost": 0,
+        "corrected_views_mean": 0.4,
+        "before_correction": {
+          "iou_mean": 0.927,
+          "series_iou_090": 24,
+          "series_lost": 5
+        }
+      },
+      "reference": {
+        "iou_mean": 0.9467,
+        "series_iou_090": 28,
+        "series_lost": 5,
+        "corrected_views_mean": 1.07,
+        "before_correction": {
+          "iou_mean": 0.7806,
+          "series_iou_090": 13,
+          "series_lost": 21
+        }
+      }
+    },
+    "series": [
+      {
+        "series": "Cole_Hardware_Hammer_Black__base",
+        "n_images": 20,
+        "time_s": 8.79,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.985,
+          "corrected_views": [],
+          "iou_mean": 0.9866,
+          "iou_min": 0.9716,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9866,
+            "iou_min": 0.9716,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 18,
+          "clicks": 6,
+          "clicked_iou": 0.9659,
+          "corrected_views": [
+            "view_012"
+          ],
+          "iou_mean": 0.9553,
+          "iou_min": 0.9171,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.8534,
+            "iou_min": 0.0,
+            "lost": [
+              "view_012",
+              "view_013"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Cole_Hardware_Hammer_Black__flip",
+        "n_images": 20,
+        "time_s": 8.87,
+        "runs": 4,
+        "object": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9809,
+          "corrected_views": [],
+          "iou_mean": 0.9841,
+          "iou_min": 0.9712,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9841,
+            "iou_min": 0.9712,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 17,
+          "clicks": 12,
+          "clicked_iou": 0.9546,
+          "corrected_views": [
+            "view_002",
+            "view_012",
+            "view_013"
+          ],
+          "iou_mean": 0.9517,
+          "iou_min": 0.8837,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.7273,
+            "iou_min": 0.0,
+            "lost": [
+              "view_002",
+              "view_003",
+              "view_013",
+              "view_014"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Cole_Hardware_Hammer_Black__noir",
+        "n_images": 20,
+        "time_s": 8.59,
+        "runs": 4,
+        "object": {
+          "views": 20,
+          "clicks": 11,
+          "clicked_iou": 0.9561,
+          "corrected_views": [
+            "view_007",
+            "view_006",
+            "view_004"
+          ],
+          "iou_mean": 0.9818,
+          "iou_min": 0.9482,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.7144,
+            "iou_min": 0.3937,
+            "lost": [
+              "view_006",
+              "view_007",
+              "view_010",
+              "view_011",
+              "view_020",
+              "view_021",
+              "view_024"
+            ]
+          }
+        },
+        "reference": {
+          "views": 20,
+          "clicks": 6,
+          "clicked_iou": 0.7417,
+          "corrected_views": [
+            "view_004"
+          ],
+          "iou_mean": 0.9484,
+          "iou_min": 0.7417,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.2301,
+            "iou_min": 0.0,
+            "lost": [
+              "view_003",
+              "view_004",
+              "view_006",
+              "view_007",
+              "view_009",
+              "view_010",
+              "view_011",
+              "view_013",
+              "view_014",
+              "view_016",
+              "view_017",
+              "view_018",
+              "view_021",
+              "view_023",
+              "view_024"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Cole_Hardware_Mug_Classic_Blue__base",
+        "n_images": 20,
+        "time_s": 8.76,
+        "runs": 1,
+        "object": {
+          "views": 20,
+          "clicks": 1,
+          "clicked_iou": 0.9861,
+          "corrected_views": [],
+          "iou_mean": 0.9767,
+          "iou_min": 0.8574,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9767,
+            "iou_min": 0.8574,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 19,
+          "clicks": 1,
+          "clicked_iou": 0.9855,
+          "corrected_views": [],
+          "iou_mean": 0.9783,
+          "iou_min": 0.8905,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9783,
+            "iou_min": 0.8905,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Cole_Hardware_Mug_Classic_Blue__noir",
+        "n_images": 18,
+        "time_s": 7.89,
+        "runs": 1,
+        "object": {
+          "views": 18,
+          "clicks": 1,
+          "clicked_iou": 0.9711,
+          "corrected_views": [],
+          "iou_mean": 0.9627,
+          "iou_min": 0.8632,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9627,
+            "iou_min": 0.8632,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 16,
+          "clicks": 1,
+          "clicked_iou": 0.9848,
+          "corrected_views": [],
+          "iou_mean": 0.9884,
+          "iou_min": 0.979,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9884,
+            "iou_min": 0.979,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Cole_Hardware_Mug_Classic_Blue__noref",
+        "n_images": 20,
+        "time_s": 9.0,
+        "runs": 3,
+        "object": {
+          "views": 20,
+          "clicks": 3,
+          "clicked_iou": 0.9843,
+          "corrected_views": [
+            "view_005",
+            "view_003"
+          ],
+          "iou_mean": 0.9763,
+          "iou_min": 0.8542,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.704,
+            "iou_min": 0.0,
+            "lost": [
+              "view_003",
+              "view_004",
+              "view_005",
+              "view_006",
+              "view_008"
+            ]
+          }
+        },
+        "reference": {
+          "views": 14,
+          "clicks": 2,
+          "clicked_iou": 0.9801,
+          "corrected_views": [
+            "view_005"
+          ],
+          "iou_mean": 0.9879,
+          "iou_min": 0.9689,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.4531,
+            "iou_min": 0.0,
+            "lost": [
+              "view_005",
+              "view_006",
+              "view_013",
+              "view_014",
+              "view_015",
+              "view_023",
+              "view_024"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Ecoforms_Plant_Container_Quadra_Turquoise_QP12__base",
+        "n_images": 18,
+        "time_s": 7.99,
+        "runs": 2,
+        "object": {
+          "views": 18,
+          "clicks": 1,
+          "clicked_iou": 0.9935,
+          "corrected_views": [],
+          "iou_mean": 0.9905,
+          "iou_min": 0.9869,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9905,
+            "iou_min": 0.9869,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 12,
+          "clicks": 4,
+          "clicked_iou": 0.9356,
+          "corrected_views": [
+            "view_005"
+          ],
+          "iou_mean": 0.9588,
+          "iou_min": 0.9356,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.6382,
+            "iou_min": 0.0,
+            "lost": [
+              "view_005",
+              "view_006",
+              "view_007",
+              "view_008"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Ecoforms_Plant_Container_Quadra_Turquoise_QP12__flip",
+        "n_images": 17,
+        "time_s": 7.58,
+        "runs": 4,
+        "object": {
+          "views": 17,
+          "clicks": 1,
+          "clicked_iou": 0.993,
+          "corrected_views": [],
+          "iou_mean": 0.9924,
+          "iou_min": 0.991,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9924,
+            "iou_min": 0.991,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 13,
+          "clicks": 7,
+          "clicked_iou": 0.9811,
+          "corrected_views": [
+            "view_003",
+            "view_004",
+            "view_001"
+          ],
+          "iou_mean": 0.5877,
+          "iou_min": 0.0,
+          "lost": [
+            "view_002",
+            "view_007",
+            "view_008",
+            "view_015",
+            "view_016"
+          ],
+          "before_correction": {
+            "iou_mean": 0.6547,
+            "iou_min": 0.0,
+            "lost": [
+              "view_002",
+              "view_003",
+              "view_004",
+              "view_015"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Ecoforms_Plant_Container_Quadra_Turquoise_QP12__noir",
+        "n_images": 20,
+        "time_s": 8.8,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9916,
+          "corrected_views": [
+            "view_020"
+          ],
+          "iou_mean": 0.989,
+          "iou_min": 0.9844,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.8263,
+            "iou_min": 0.2473,
+            "lost": [
+              "view_020",
+              "view_026"
+            ]
+          }
+        },
+        "reference": {
+          "views": 14,
+          "clicks": 4,
+          "clicked_iou": 0.9549,
+          "corrected_views": [
+            "view_003"
+          ],
+          "iou_mean": 0.9454,
+          "iou_min": 0.9234,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.8087,
+            "iou_min": 0.0,
+            "lost": [
+              "view_003",
+              "view_004"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Logitech_Ultimate_Ears_Boom_Wireless_Speaker_Night_Black__base",
+        "n_images": 20,
+        "time_s": 8.74,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 3,
+          "clicked_iou": 0.9925,
+          "corrected_views": [
+            "view_034"
+          ],
+          "iou_mean": 0.9888,
+          "iou_min": 0.9497,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9333,
+            "iou_min": 0.6286,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 19,
+          "clicks": 1,
+          "clicked_iou": 0.9917,
+          "corrected_views": [],
+          "iou_mean": 0.9883,
+          "iou_min": 0.9552,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9883,
+            "iou_min": 0.9552,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Logitech_Ultimate_Ears_Boom_Wireless_Speaker_Night_Black__noir",
+        "n_images": 16,
+        "time_s": 7.11,
+        "runs": 2,
+        "object": {
+          "views": 16,
+          "clicks": 3,
+          "clicked_iou": 0.9932,
+          "corrected_views": [
+            "view_013"
+          ],
+          "iou_mean": 0.9914,
+          "iou_min": 0.9839,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.8488,
+            "iou_min": 0.615,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 14,
+          "clicks": 1,
+          "clicked_iou": 0.9841,
+          "corrected_views": [],
+          "iou_mean": 0.9886,
+          "iou_min": 0.9824,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9886,
+            "iou_min": 0.9824,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Logitech_Ultimate_Ears_Boom_Wireless_Speaker_Night_Black__noref",
+        "n_images": 20,
+        "time_s": 8.83,
+        "runs": 3,
+        "object": {
+          "views": 20,
+          "clicks": 4,
+          "clicked_iou": 0.9877,
+          "corrected_views": [
+            "view_014",
+            "view_035"
+          ],
+          "iou_mean": 0.9898,
+          "iou_min": 0.9788,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.7117,
+            "iou_min": 0.0,
+            "lost": [
+              "view_014",
+              "view_016",
+              "view_018"
+            ]
+          }
+        },
+        "reference": {
+          "views": 16,
+          "clicks": 1,
+          "clicked_iou": 0.9898,
+          "corrected_views": [],
+          "iou_mean": 0.9287,
+          "iou_min": 0.0,
+          "lost": [
+            "view_033"
+          ],
+          "before_correction": {
+            "iou_mean": 0.9287,
+            "iou_min": 0.0,
+            "lost": [
+              "view_033"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Markings_Desk_Caddy__base",
+        "n_images": 17,
+        "time_s": 7.58,
+        "runs": 1,
+        "object": {
+          "views": 17,
+          "clicks": 1,
+          "clicked_iou": 0.9906,
+          "corrected_views": [],
+          "iou_mean": 0.9873,
+          "iou_min": 0.9791,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9873,
+            "iou_min": 0.9791,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 14,
+          "clicks": 3,
+          "clicked_iou": 0.9721,
+          "corrected_views": [],
+          "iou_mean": 0.9733,
+          "iou_min": 0.9486,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9733,
+            "iou_min": 0.9486,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Markings_Desk_Caddy__incomplete",
+        "n_images": 18,
+        "time_s": 8.09,
+        "runs": 3,
+        "object": {
+          "views": 18,
+          "clicks": 3,
+          "clicked_iou": 0.9909,
+          "corrected_views": [],
+          "iou_mean": 0.9902,
+          "iou_min": 0.9872,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9902,
+            "iou_min": 0.9872,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 11,
+          "clicks": 9,
+          "clicked_iou": 0.9622,
+          "corrected_views": [
+            "view_007",
+            "view_001"
+          ],
+          "iou_mean": 0.9588,
+          "iou_min": 0.9192,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.7013,
+            "iou_min": 0.0,
+            "lost": [
+              "view_007",
+              "view_008",
+              "view_016"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Markings_Desk_Caddy__noir",
+        "n_images": 20,
+        "time_s": 8.98,
+        "runs": 3,
+        "object": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9861,
+          "corrected_views": [],
+          "iou_mean": 0.9888,
+          "iou_min": 0.9851,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9888,
+            "iou_min": 0.9851,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 15,
+          "clicks": 7,
+          "clicked_iou": 0.9178,
+          "corrected_views": [
+            "view_001",
+            "view_010"
+          ],
+          "iou_mean": 0.9641,
+          "iou_min": 0.9056,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.2523,
+            "iou_min": 0.0,
+            "lost": [
+              "view_001",
+              "view_002",
+              "view_003",
+              "view_004",
+              "view_008",
+              "view_009",
+              "view_010",
+              "view_011",
+              "view_015",
+              "view_016",
+              "view_017"
+            ]
+          }
+        }
+      },
+      {
+        "series": "OXO_Soft_Works_Can_Opener_SnapLock__base",
+        "n_images": 20,
+        "time_s": 8.86,
+        "runs": 1,
+        "object": {
+          "views": 20,
+          "clicks": 5,
+          "clicked_iou": 0.9443,
+          "corrected_views": [],
+          "iou_mean": 0.9781,
+          "iou_min": 0.9434,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9781,
+            "iou_min": 0.9434,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 20,
+          "clicks": 1,
+          "clicked_iou": 0.9898,
+          "corrected_views": [],
+          "iou_mean": 0.9893,
+          "iou_min": 0.9612,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9893,
+            "iou_min": 0.9612,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "OXO_Soft_Works_Can_Opener_SnapLock__noir",
+        "n_images": 20,
+        "time_s": 8.98,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 3,
+          "clicked_iou": 0.9663,
+          "corrected_views": [],
+          "iou_mean": 0.9837,
+          "iou_min": 0.9663,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9837,
+            "iou_min": 0.9663,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9861,
+          "corrected_views": [
+            "view_006"
+          ],
+          "iou_mean": 0.9874,
+          "iou_min": 0.9125,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.7396,
+            "iou_min": 0.0,
+            "lost": [
+              "view_006",
+              "view_008",
+              "view_010",
+              "view_012",
+              "view_014"
+            ]
+          }
+        }
+      },
+      {
+        "series": "OXO_Soft_Works_Can_Opener_SnapLock__noref",
+        "n_images": 20,
+        "time_s": 9.22,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 6,
+          "clicked_iou": 0.9781,
+          "corrected_views": [
+            "view_012"
+          ],
+          "iou_mean": 0.9746,
+          "iou_min": 0.9325,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9632,
+            "iou_min": 0.6611,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 16,
+          "clicks": 2,
+          "clicked_iou": 0.9652,
+          "corrected_views": [
+            "view_013"
+          ],
+          "iou_mean": 0.9845,
+          "iou_min": 0.9652,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.5516,
+            "iou_min": 0.0,
+            "lost": [
+              "view_013",
+              "view_014",
+              "view_016",
+              "view_017",
+              "view_018",
+              "view_019",
+              "view_020"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Pony_C_Clamp_1440__base",
+        "n_images": 20,
+        "time_s": 8.94,
+        "runs": 4,
+        "object": {
+          "views": 20,
+          "clicks": 1,
+          "clicked_iou": 0.9666,
+          "corrected_views": [],
+          "iou_mean": 0.9702,
+          "iou_min": 0.9465,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9702,
+            "iou_min": 0.9465,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 20,
+          "clicks": 13,
+          "clicked_iou": 0.8281,
+          "corrected_views": [
+            "view_004",
+            "view_002",
+            "view_005"
+          ],
+          "iou_mean": 0.8179,
+          "iou_min": 0.0,
+          "lost": [
+            "view_007",
+            "view_009",
+            "view_011"
+          ],
+          "before_correction": {
+            "iou_mean": 0.8147,
+            "iou_min": 0.0,
+            "lost": [
+              "view_004",
+              "view_005",
+              "view_007"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Pony_C_Clamp_1440__incomplete",
+        "n_images": 20,
+        "time_s": 8.89,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 1,
+          "clicked_iou": 0.9762,
+          "corrected_views": [],
+          "iou_mean": 0.9724,
+          "iou_min": 0.9538,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9724,
+            "iou_min": 0.9538,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9753,
+          "corrected_views": [
+            "view_007"
+          ],
+          "iou_mean": 0.972,
+          "iou_min": 0.9437,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.8762,
+            "iou_min": 0.0,
+            "lost": [
+              "view_007",
+              "view_008"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Pony_C_Clamp_1440__noir",
+        "n_images": 19,
+        "time_s": 8.49,
+        "runs": 2,
+        "object": {
+          "views": 19,
+          "clicks": 1,
+          "clicked_iou": 0.969,
+          "corrected_views": [],
+          "iou_mean": 0.9749,
+          "iou_min": 0.9452,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9749,
+            "iou_min": 0.9452,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 19,
+          "clicks": 6,
+          "clicked_iou": 0.945,
+          "corrected_views": [
+            "view_001"
+          ],
+          "iou_mean": 0.9649,
+          "iou_min": 0.8925,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.7556,
+            "iou_min": 0.0,
+            "lost": [
+              "view_001",
+              "view_002",
+              "view_003",
+              "view_004"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Razer_Taipan_Black_Ambidextrous_Gaming_Mouse__base",
+        "n_images": 20,
+        "time_s": 8.98,
+        "runs": 1,
+        "object": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9719,
+          "corrected_views": [],
+          "iou_mean": 0.9785,
+          "iou_min": 0.9672,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9785,
+            "iou_min": 0.9672,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.956,
+          "corrected_views": [],
+          "iou_mean": 0.9576,
+          "iou_min": 0.877,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9576,
+            "iou_min": 0.877,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Razer_Taipan_Black_Ambidextrous_Gaming_Mouse__flip",
+        "n_images": 20,
+        "time_s": 8.85,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 5,
+          "clicked_iou": 0.9819,
+          "corrected_views": [
+            "view_012"
+          ],
+          "iou_mean": 0.9794,
+          "iou_min": 0.9576,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.5286,
+            "iou_min": 0.2008,
+            "lost": [
+              "view_005",
+              "view_011",
+              "view_012",
+              "view_013",
+              "view_014",
+              "view_016",
+              "view_017",
+              "view_018",
+              "view_020",
+              "view_021",
+              "view_022",
+              "view_024",
+              "view_025"
+            ]
+          }
+        },
+        "reference": {
+          "views": 19,
+          "clicks": 2,
+          "clicked_iou": 0.9584,
+          "corrected_views": [],
+          "iou_mean": 0.9072,
+          "iou_min": 0.0,
+          "lost": [
+            "view_014"
+          ],
+          "before_correction": {
+            "iou_mean": 0.9072,
+            "iou_min": 0.0,
+            "lost": [
+              "view_014"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Razer_Taipan_Black_Ambidextrous_Gaming_Mouse__noir",
+        "n_images": 20,
+        "time_s": 9.03,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9537,
+          "corrected_views": [],
+          "iou_mean": 0.9762,
+          "iou_min": 0.9537,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9762,
+            "iou_min": 0.9537,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 20,
+          "clicks": 7,
+          "clicked_iou": 0.9697,
+          "corrected_views": [
+            "view_012"
+          ],
+          "iou_mean": 0.9601,
+          "iou_min": 0.8637,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9528,
+            "iou_min": 0.7697,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Shurtape_Gaffers_Tape_Silver_2_x_60_yd__base",
+        "n_images": 18,
+        "time_s": 8.5,
+        "runs": 1,
+        "object": {
+          "views": 18,
+          "clicks": 2,
+          "clicked_iou": 0.986,
+          "corrected_views": [],
+          "iou_mean": 0.9733,
+          "iou_min": 0.9005,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9733,
+            "iou_min": 0.9005,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 15,
+          "clicks": 3,
+          "clicked_iou": 0.9561,
+          "corrected_views": [],
+          "iou_mean": 0.913,
+          "iou_min": 0.0,
+          "lost": [
+            "view_001"
+          ],
+          "before_correction": {
+            "iou_mean": 0.913,
+            "iou_min": 0.0,
+            "lost": [
+              "view_001"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Shurtape_Gaffers_Tape_Silver_2_x_60_yd__incomplete",
+        "n_images": 20,
+        "time_s": 9.5,
+        "runs": 2,
+        "object": {
+          "views": 20,
+          "clicks": 2,
+          "clicked_iou": 0.9904,
+          "corrected_views": [],
+          "iou_mean": 0.979,
+          "iou_min": 0.9015,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.979,
+            "iou_min": 0.9015,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 15,
+          "clicks": 3,
+          "clicked_iou": 0.9713,
+          "corrected_views": [
+            "view_013"
+          ],
+          "iou_mean": 0.9719,
+          "iou_min": 0.9036,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.907,
+            "iou_min": 0.0,
+            "lost": [
+              "view_013"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Shurtape_Gaffers_Tape_Silver_2_x_60_yd__noir",
+        "n_images": 20,
+        "time_s": 9.13,
+        "runs": 4,
+        "object": {
+          "views": 20,
+          "clicks": 1,
+          "clicked_iou": 0.9947,
+          "corrected_views": [],
+          "iou_mean": 0.9619,
+          "iou_min": 0.8702,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9619,
+            "iou_min": 0.8702,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 15,
+          "clicks": 15,
+          "clicked_iou": 0.9607,
+          "corrected_views": [
+            "view_007",
+            "view_020",
+            "view_021"
+          ],
+          "iou_mean": 0.9662,
+          "iou_min": 0.8308,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.8955,
+            "iou_min": 0.0,
+            "lost": [
+              "view_007"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Threshold_Porcelain_Teapot_White__base",
+        "n_images": 20,
+        "time_s": 9.11,
+        "runs": 1,
+        "object": {
+          "views": 20,
+          "clicks": 1,
+          "clicked_iou": 0.9883,
+          "corrected_views": [],
+          "iou_mean": 0.9921,
+          "iou_min": 0.9883,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9921,
+            "iou_min": 0.9883,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 17,
+          "clicks": 1,
+          "clicked_iou": 0.9625,
+          "corrected_views": [],
+          "iou_mean": 0.9611,
+          "iou_min": 0.8016,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9611,
+            "iou_min": 0.8016,
+            "lost": []
+          }
+        }
+      },
+      {
+        "series": "Threshold_Porcelain_Teapot_White__incomplete",
+        "n_images": 20,
+        "time_s": 9.29,
+        "runs": 4,
+        "object": {
+          "views": 20,
+          "clicks": 1,
+          "clicked_iou": 0.992,
+          "corrected_views": [],
+          "iou_mean": 0.9923,
+          "iou_min": 0.9903,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9923,
+            "iou_min": 0.9903,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 16,
+          "clicks": 8,
+          "clicked_iou": 0.9479,
+          "corrected_views": [
+            "view_003",
+            "view_007",
+            "view_014"
+          ],
+          "iou_mean": 0.9706,
+          "iou_min": 0.9479,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.5447,
+            "iou_min": 0.0,
+            "lost": [
+              "view_003",
+              "view_004",
+              "view_005",
+              "view_006",
+              "view_011",
+              "view_012",
+              "view_013"
+            ]
+          }
+        }
+      },
+      {
+        "series": "Threshold_Porcelain_Teapot_White__noir",
+        "n_images": 18,
+        "time_s": 8.33,
+        "runs": 3,
+        "object": {
+          "views": 18,
+          "clicks": 3,
+          "clicked_iou": 0.9724,
+          "corrected_views": [],
+          "iou_mean": 0.9868,
+          "iou_min": 0.9724,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.9868,
+            "iou_min": 0.9724,
+            "lost": []
+          }
+        },
+        "reference": {
+          "views": 14,
+          "clicks": 3,
+          "clicked_iou": 0.9843,
+          "corrected_views": [
+            "view_004",
+            "view_012"
+          ],
+          "iou_mean": 0.975,
+          "iou_min": 0.9625,
+          "lost": [],
+          "before_correction": {
+            "iou_mean": 0.4871,
+            "iou_min": 0.0,
+            "lost": [
+              "view_004",
+              "view_005",
+              "view_006",
+              "view_012",
+              "view_013",
+              "view_014",
+              "view_015"
+            ]
+          }
+        }
+      }
+    ]
   }
 ]

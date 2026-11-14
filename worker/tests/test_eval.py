@@ -115,6 +115,15 @@ def test_dtu_adapter_projects_gt_points_into_images():
         assert inside > 0.8
 
 
+def test_to_correct_picks_worst_visible_unclicked_view():
+    from tools.eval.segment import to_correct
+
+    scores = {"a": 0.1, "b": 0.3, "c": 0.5, "d": 0.95}
+    assert to_correct(scores, clickable={"a", "b", "c", "d"}, clicked={"a"}) == "b"
+    assert to_correct(scores, clickable={"c", "d"}, clicked=set()) == "c"  # a, b : cible trop petite
+    assert to_correct(scores, clickable={"d"}, clicked=set()) is None  # déjà au-dessus du seuil
+
+
 def test_inner_point_stays_inside_concave_mask():
     from tools.eval.segment import inner_point
 

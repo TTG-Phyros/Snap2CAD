@@ -22,3 +22,25 @@ Observations :
 - La référence, petite (≈ 0,1 à 1 % de l'image), se perd bien plus souvent et ne revient pas toujours.
 - Suite : repli guidé en 3D (clic remonté par la profondeur VGGT et reprojeté dans chaque vue), puis nouvelle mesure.
 - Temps de l'étape : ≈ 11 s par série de 20 vues (médiane), chargement du modèle compris.
+
+## Avec correction manuelle (clics sur les vues fautives)
+
+L'étape `segment` accepte des clics positifs et négatifs sur n'importe quelle photo : corriger, c'est ajouter
+des clics sur la vue fausse et relancer l'étape (≈ 9 s pour 20 vues). L'évaluation simule l'utilisateur :
+après chaque passage, il corrige la pire vue sous IoU 0,8 où la cible est assez visible pour cliquer
+(≥ 2000 px), avec les mêmes clics que sur la 1ʳᵉ vue, au plus 3 vues par cible. Mêmes conditions que ci-dessus.
+
+| Cible | IoU moyenne | Séries ≥ 0,9 | Séries sans vue perdue | Vues corrigées (moyenne) |
+|---|---:|---:|---:|---:|
+| Objet | 0,927 → **0,982** | 24 → **30** / 30 | 25 → **30** / 30 | 0,4 |
+| Référence (pièce, carte) | 0,781 → 0,947 | 13 → 28 / 30 | 9 → 25 / 30 | 1,1 |
+
+Critère du plan pour l'objet (IoU ≥ 0,9, aucune perte sur 20 vues) : **atteint avec correction**, au plus 3 vues
+corrigées par série (souris `flip` : 1 vue suffit pour 13 vues perdues ; marteau `noir` : 3 vues).
+
+Observations :
+- Une seule vue corrigée rattrape souvent toute la série : le clic sert de mémoire à la propagation dans les deux sens.
+- Référence encore perdue sur 5 séries. Sur 3 d'entre elles, une seule vue est perdue et la pièce y est trop petite
+  pour un clic simulé (< 2000 px). Sur les 2 autres (`Ecoforms…flip`, `Pony_C_Clamp…base`), 3 corrections ne suffisent pas.
+  L'échelle demande la référence sur ≥ 5 vues (plan §1), pas sur toutes : ces vues seront écartées en M4.
+- La simulation est optimiste sur le choix de la vue (elle connaît la vérité terrain) ; un utilisateur la voit à l'écran.
