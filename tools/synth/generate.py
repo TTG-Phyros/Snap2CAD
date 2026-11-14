@@ -515,10 +515,11 @@ def check(out: Path, verts: np.ndarray) -> None:
         assert on_obj.mean() > 0.9, f"{out.name}/{stem} : {on_obj.mean():.3f} des sommets sur le masque"
         dz = depth[i, j][on_obj] - z[ok][on_obj]
         # Seuils lâches (bords de silhouette, objets fins) : une erreur de convention (pose, profondeur
-        # « distance au centre » au lieu de z caméra) met la moitié des sommets en défaut.
+        # « distance au centre » au lieu de z caméra) met la moitié des sommets en défaut. Objets creux
+        # (pot, range-stylos) : jusqu'à 92 % des sommets sur des parois cachées, d'où 5 % sur la surface.
         front, surface = (dz > 1.5).mean(), (np.abs(dz) < 0.5).mean()
         assert front < 0.1, f"{out.name}/{stem} : {front:.3f} des sommets devant la surface visible"
-        assert surface > 0.1, f"{out.name}/{stem} : {surface:.3f} des sommets sur la surface visible"
+        assert surface > 0.05, f"{out.name}/{stem} : {surface:.3f} des sommets sur la surface visible"
 
 
 def first_batch() -> list[str]:
