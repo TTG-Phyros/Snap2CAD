@@ -3,7 +3,9 @@
 Usage : uv run --project worker python -m tools.eval.segment [série ...] [--n 20] [--work DOSSIER]
 Clics simulés comme un utilisateur, sur la première photo (ordre EXIF) où la cible est bien visible : un
 point au cœur de la cible, puis des clics de correction au cœur de la plus grande erreur (SAM en mode
-image) jusqu'à IoU ≥ 0,95, au plus 5 clics. Par défaut : toutes les séries de datasets/synth.
+image) jusqu'à IoU ≥ 0,95, au plus 5 clics. Puis correction manuelle simulée : tant qu'une vue reste sous
+IoU 0,8, l'utilisateur clique de même sur la pire (au plus 3 vues par cible) et relance l'étape.
+Par défaut : toutes les séries de datasets/synth.
 Résultats ajoutés dans docs/benchmarks/segment.json.
 """
 
@@ -37,6 +39,7 @@ LABELS = {"object": 1, "reference": 2}  # valeurs de `labels/*.png` (tools/synth
 MIN_CLICK_PX = 2000  # cible assez visible pour y cliquer
 LOST_IOU = 0.5
 MAX_CLICKS, CLICK_IOU = 5, 0.95
+MAX_CORRECTIONS, CORRECT_IOU = 3, 0.8  # vues corrigées par cible ; une vue sous ce seuil se voit à l'écran
 
 
 def inner_point(mask: np.ndarray, step: int = 8) -> tuple[float, float]:
@@ -59,7 +62,7 @@ def iou(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def user_clicks(predictor: SAM2ImagePredictor, gt: np.ndarray) -> list[tuple[float, float, bool]]:
-    """Clic au cœur de `gt`, puis corrections au cœur de l'erreur dominante (manqué → +, en trop → −)."""
+    """Clic au cœur de `gt`, puis corrections au cœur de l'erreur dominante (manqué -> +, en trop -> −)."""
     clicks = [(*inner_point(gt), True)]
     while len(clicks) < MAX_CLICKS:
         masks, scores, _ = predictor.predict(
@@ -76,6 +79,12 @@ def user_clicks(predictor: SAM2ImagePredictor, gt: np.ndarray) -> list[tuple[flo
     return clicks
 
 
+def to_correct(scores: dict[str, float], clickable: set[str], clicked: set[str]) -> str | None:
+    """Vue que l'utilisateur corrige : la pire sous CORRECT_IOU, où la cible se voit, pas encore cliquée."""
+    bad = [s for s, x in scores.items() if x < CORRECT_IOU and s in clickable and s not in clicked]
+    return min(bad, key=scores.__getitem__, default=None)
+
+
 def evaluate(
     series: str, work: Path, n: int, info: device.DeviceInfo, predictor: SAM2ImagePredictor
 ) -> dict[str, Any]:
@@ -88,31 +97,56 @@ def evaluate(
     frames = segment.frame_order(json.loads((root / "exif.json").read_text("utf-8")))
     stems = [Path(e["file"]).stem for e in frames]
     gt = {s: np.asarray(Image.open(SYNTH / series / "labels" / f"{s}.png")) for s in stems}
-    clicks: dict[str, list[dict[str, Any]]] = {}
-    for target, label in LABELS.items():
-        s = next((s for s in stems if (gt[s] == label).sum() >= MIN_CLICK_PX), None)
-        if s is not None:
-            with torch.inference_mode(), device.autocast(info):
-                predictor.set_image(np.asarray(Image.open(root / "images" / f"{s}.jpg").convert("RGB")))
-                cs = user_clicks(predictor, gt[s] == label)
-            clicks[target] = [{"image": f"{s}.jpg", "x": x, "y": y, "positive": p} for x, y, p in cs]
-    rec = segment.run(project, info, {"clicks": clicks})
 
-    out: dict[str, Any] = {"series": series, "n_images": len(stems), "time_s": rec["duration_s"]}
-    for target, tc in clicks.items():
+    def click(target: str, s: str) -> list[dict[str, Any]]:
+        with torch.inference_mode(), device.autocast(info):
+            predictor.set_image(np.asarray(Image.open(root / "images" / f"{s}.jpg").convert("RGB")))
+            cs = user_clicks(predictor, gt[s] == LABELS[target])
+        return [{"image": f"{s}.jpg", "x": x, "y": y, "positive": p} for x, y, p in cs]
+
+    clickable = {
+        t: {s for s in stems if (gt[s] == label).sum() >= MIN_CLICK_PX} for t, label in LABELS.items()
+    }
+    clicks = {t: click(t, s) for t in LABELS if (s := next((s for s in stems if s in clickable[t]), None))}
+    corrected: dict[str, list[str]] = {t: [] for t in clicks}
+    runs = []
+    while True:
+        rec = segment.run(project, info, {"clicks": clicks})
         scores = {}
-        for s in stems:
-            g = gt[s] == LABELS[target]
-            if g.mean() >= segment.PARAMS["min_area_ratio"]:  # IoU indéfinie si la cible est absente
-                scores[s] = iou(np.asarray(Image.open(root / f"masks/{target}/{s}.png")) > 0, g)
-        v = np.array(list(scores.values()))
+        for target in clicks:
+            scores[target] = {
+                s: iou(np.asarray(Image.open(root / f"masks/{target}/{s}.png")) > 0, gt[s] == LABELS[target])
+                for s in stems
+                if (gt[s] == LABELS[target]).mean() >= segment.PARAMS["min_area_ratio"]  # IoU indéfinie sinon
+            }
+        runs.append((rec["duration_s"], scores))
+        todo = {
+            t: v
+            for t in clicks
+            if len(corrected[t]) < MAX_CORRECTIONS
+            and (v := to_correct(scores[t], clickable[t], {c["image"][:-4] for c in clicks[t]}))
+        }
+        if not todo:
+            break
+        for t, v in todo.items():
+            corrected[t].append(v)
+            clicks[t] += click(t, v)
+
+    def stats(sc: dict[str, float]) -> dict[str, Any]:
+        v = np.array(list(sc.values()))
+        lost = sorted(s for s, x in sc.items() if x < LOST_IOU)
+        return {"iou_mean": round(float(v.mean()), 4), "iou_min": round(float(v.min()), 4), "lost": lost}
+
+    out: dict[str, Any] = {"series": series, "n_images": len(stems), "time_s": runs[0][0], "runs": len(runs)}
+    for target, tc in clicks.items():
+        first, final = runs[0][1][target], runs[-1][1][target]
         out[target] = {
-            "views": len(v),
+            "views": len(final),
             "clicks": len(tc),
-            "clicked_iou": round(scores[tc[0]["image"][:-4]], 4),
-            "iou_mean": round(float(v.mean()), 4),
-            "iou_min": round(float(v.min()), 4),
-            "lost": sorted(s for s, x in scores.items() if x < LOST_IOU),
+            "clicked_iou": round(final[tc[0]["image"][:-4]], 4),
+            "corrected_views": corrected[target],
+            **stats(final),
+            "before_correction": stats(first),
         }
     return out
 
@@ -134,20 +168,29 @@ def main() -> None:
         print(
             f"{s:40s}"
             + "".join(
-                f"  {t} {r[t]['clicks']} clic(s) IoU cliquée {r[t]['clicked_iou']:.3f} "
-                f"moy {r[t]['iou_mean']:.3f} min {r[t]['iou_min']:.3f} perdues {len(r[t]['lost'])}"
+                f"  {t} {r[t]['clicks']} clic(s) {len(r[t]['corrected_views'])} vue(s) corrigée(s) "
+                f"moy {r[t]['before_correction']['iou_mean']:.3f} -> {r[t]['iou_mean']:.3f} "
+                f"min {r[t]['iou_min']:.3f} perdues {len(r[t]['before_correction']['lost'])} -> {len(r[t]['lost'])}"
                 for t in LABELS
                 if t in r
             )
         )
-    summary = {
-        t: {
-            "iou_mean": round(float(np.mean([r[t]["iou_mean"] for r in rows if t in r])), 4),
-            "series_lost": sum(bool(r[t]["lost"]) for r in rows if t in r),
+
+    def agg(rs: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "iou_mean": round(float(np.mean([r["iou_mean"] for r in rs])), 4),
+            "series_iou_090": sum(r["iou_mean"] >= 0.9 for r in rs),
+            "series_lost": sum(bool(r["lost"]) for r in rs),
         }
-        for t in LABELS
-        if any(t in r for r in rows)
-    }
+
+    summary = {}
+    for t in LABELS:
+        if rs := [r[t] for r in rows if t in r]:
+            summary[t] = {
+                **agg(rs),
+                "corrected_views_mean": round(float(np.mean([len(r["corrected_views"]) for r in rs])), 2),
+                "before_correction": agg([r["before_correction"] for r in rs]),
+            }
     print("résumé :", summary)
 
     commit = subprocess.run(
@@ -157,7 +200,8 @@ def main() -> None:
         "date": time.strftime("%Y-%m-%d"),
         "commit": commit.stdout.strip(),
         "gpu": info.name,
-        "method": f"SAM 2.1 vidéo (segment, {name}), clics simulés sur la 1re vue (≤ {MAX_CLICKS}, IoU ≥ {CLICK_IOU})",
+        "method": f"SAM 2.1 vidéo (segment, {name}), clics simulés sur la 1re vue (≤ {MAX_CLICKS}, IoU ≥ {CLICK_IOU}), "
+        f"puis correction des vues sous IoU {CORRECT_IOU} (≤ {MAX_CORRECTIONS} par cible)",
         "n_views": a.n,
         "summary": summary,
         "series": rows,
