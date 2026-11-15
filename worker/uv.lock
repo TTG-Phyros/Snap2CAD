@@ -944,6 +944,7 @@ source = { editable = "." }
 dependencies = [
     { name = "lightglue" },
     { name = "numpy" },
+    { name = "opencv-python" },
     { name = "pillow" },
     { name = "pillow-heif" },
     { name = "pycolmap" },
@@ -969,6 +970,7 @@ dev = [
 requires-dist = [
     { name = "lightglue", git = "https://github.com/jytime/LightGlue?rev=2f23ca2ea9638cecad7f7220795210fc6b8353c3" },
     { name = "numpy", specifier = "==1.26.4" },
+    { name = "opencv-python", specifier = ">=4.10" },
     { name = "pillow" },
     { name = "pillow-heif", specifier = ">=1.8.1" },
     { name = "pycolmap", specifier = "==3.11.*" },

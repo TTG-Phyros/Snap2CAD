@@ -15,6 +15,7 @@ dependencies = [
     "sam-2",
     "pycolmap==3.11.*",
     "lightglue",
+    "opencv-python>=4.10",
 ]
 
 [dependency-groups]
