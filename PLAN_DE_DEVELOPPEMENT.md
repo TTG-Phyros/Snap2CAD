@@ -1,7 +1,7 @@
 # Snap2CAD — Plan de développement
 
 > Version 1.0 — 11 novembre 2026
-> Statut : plan validé sur les décisions de cadrage. **M0 en cours** : socle fait et mesuré sur la RTX 3060 Laptop, reste la RTX 4060.
+> Statut : plan validé sur les décisions de cadrage. **M0 en cours** : socle fait, VGGT mesuré sur la RTX 4060 (N₈ = 28). N₆ reste à remesurer sur la RTX 3060 Laptop avec le plafond VRAM.
 > Visuels : voir [Annexes](docs/annexes/ANNEXES.md) (architecture, pipeline, VRAM, données, jalons, validation).
 
 ---
@@ -368,6 +368,7 @@ Commits figés : VGGT `a288dd0`, Hunyuan3D-2 `f8db630`, CAD-Recode `03e3262`.
 **Règles :**
 - une étape GPU = un sous-processus ;
 - un seul modèle en VRAM ;
+- la VRAM de chaque processus est plafonnée à *libre au lancement − 256 Mo* (`device.cap_cuda_memory`) ;
 - le pic de VRAM est mesuré (`torch.cuda.max_memory_allocated`) et enregistré dans `project.json`.
 
 | Étape | Profil `full` (≥ 8 Go) | Profil `degraded` (6 Go) | Estimation VRAM (à mesurer) |
@@ -379,7 +380,7 @@ Commits figés : VGGT `a288dd0`, Hunyuan3D-2 `f8db630`, CAD-Recode `03e3262`.
 | Hunyuan3D-2mv | fp16, FlashVDM | **désactivé** (ou déchargement processeur sur demande) | ≈ 6 Go |
 | CAD-Recode | bf16, sdpa | bf16, sdpa | ≈ 3,5 Go |
 
-N₈ et N₆ sont fixés au jalon M0 par mesure sur la RTX 4060 et la RTX 3060 Laptop. **Mesuré : N₆ = 20** pour des photos 4:3 ([docs/benchmarks/M0-vggt.md](docs/benchmarks/M0-vggt.md)). N₈ reste à mesurer.
+N₈ et N₆ sont fixés au jalon M0 par mesure sur la RTX 4060 et la RTX 3060 Laptop ([docs/benchmarks/M0-vggt.md](docs/benchmarks/M0-vggt.md)). Chaque processus plafonne sa VRAM à *libre au lancement − 256 Mo* (`device.cap_cuda_memory`) : sans ce plafond, Windows déborde en mémoire partagée au lieu d'échouer, et les étapes deviennent 2 à 3 fois plus lentes. **Mesuré : N₈ = 28** pour des photos 4:3, sous ce plafond (36 avec un bureau léger). N₆ = 20 avait été mesuré avant le plafond : il reste à remesurer sur la 3060.
 
 ---
 
