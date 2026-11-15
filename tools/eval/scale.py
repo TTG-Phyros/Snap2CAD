@@ -26,6 +26,7 @@ import pycolmap
 from PIL import Image
 
 from snap2cad.steps import scale
+from tools.eval import metrics
 
 ROOT = Path(__file__).resolve().parents[2]
 SYNTH = ROOT / "datasets/synth"
@@ -75,7 +76,7 @@ def evaluate(series: str, params: dict[str, Any] | None = None) -> dict[str, Any
         }
     W, H = scene["camera"]["width"], scene["camera"]["height"]
     c0 = np.array(ref["center_mm"])
-    views = []
+    views, fits, ups = [], [], {}
     for mpath in sorted((proj / "masks/reference").glob("*.png")):
         mask = np.asarray(Image.open(mpath)) > 0
         if mask.sum() < MIN_MASK_PX:  # référence absente ou perdue par `segment`
@@ -89,6 +90,7 @@ def evaluate(series: str, params: dict[str, Any] | None = None) -> dict[str, Any
         hull = cv2.convexHull(np.r_[top, pinhole(reference_outline(ref, 0.0), w2c, K)].astype(np.float32))
         # « Haut » : normale de la table projetée au centre de la référence (en production : plan et poses).
         a, b = pinhole(np.stack([c0, c0 + [0, 0, 10.0]]), w2c, K)
+        ups[mpath.stem] = b - a
         v: dict[str, Any] = {"view": mpath.stem, "size_px": round(float(np.ptp(hull[:, 0], 0).max()), 1)}
         try:
             fit = scale.fit_view(rgb, mask, cam, ref["type"], up=(b - a), params=params)
@@ -112,7 +114,85 @@ def evaluate(series: str, params: dict[str, Any] | None = None) -> dict[str, Any
             v["size_err_pct"] = np.round((fa - ga) / ga * 100, 3).tolist()
         v["failed"] = bool(np.abs(v["size_err_pct"]).max() > FAIL_PCT)
         views.append(v)
-    return {"series": series, "reference": ref["type"], "views": views}
+        fits.append({"name": mpath.stem, "K": K, "cam_from_world": w2c, **fit})
+    exact = fit3d(fits, ref, 1.0)
+    if "rejected" in exact:  # tri par la cohérence entre vues vs vues ratées (erreur de taille > 2 %)
+        failed = {v["view"] for v in views if v.get("failed")}
+        exact["kept_failed"] = sorted(failed - set(exact["rejected"]))
+        exact["rejected_ok"] = sorted(set(exact["rejected"]) - failed)
+    out = {"series": series, "reference": ref["type"], "views": views, "fit3d": {"exact": exact}}
+    if (proj / "sparse").is_dir():
+        out["fit3d"]["ba"] = fit3d_ba(proj, ref, cams, ups, params)
+    return out
+
+
+def fit3d(fits: list[dict[str, Any]], ref: dict[str, Any], mm_per_unit: float) -> dict[str, Any]:
+    """Cercle ou rectangle 3D sur les vues ajustées ; erreur d'échelle (%) vs `mm_per_unit` (vérité)."""
+    try:
+        f = scale.fit_rectangle(fits) if ref["type"] == "card" else scale.fit_circle(fits, ref["type"])
+    except ValueError as e:
+        return {"error": str(e)}
+    err = (np.atleast_1d(f["mm_per_unit"]) / mm_per_unit - 1) * 100
+    return {
+        "scale_err_pct": np.round(err, 4).tolist(),  # pièce : diamètre ; carte : grand puis petit côté
+        "n_views": len(f["views"]),
+        "rejected": f["rejected"],
+        "rms_px_median": round(float(np.median([f["rms_px"][n] for n in f["views"]])), 4),
+    }
+
+
+def fit3d_ba(
+    proj: Path,
+    ref: dict[str, Any],
+    cams: dict[str, Any],
+    ups: dict[str, np.ndarray],
+    params: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Même chose avec les caméras de `ba` (distorsion comprise) ; vérité : similitude des centres des caméras
+    `ba` → vérité terrain (mm par unité `ba`)."""
+    rec = pycolmap.Reconstruction(proj / "sparse")
+    fits, src, dst = [], [], []
+    for im in rec.images.values():
+        stem = Path(im.name).stem
+        w2c = im.cam_from_world.matrix()
+        src.append(-w2c[:, :3].T @ w2c[:, 3])
+        dst.append(metrics.camera_centers(cams[stem][0][None])[0])
+        if stem not in ups:
+            continue
+        cam = rec.cameras[im.camera_id]
+        mask = np.asarray(Image.open(proj / "masks/reference" / f"{stem}.png")) > 0
+        rgb = np.asarray(Image.open(proj / "images" / im.name).convert("RGB"))
+        try:
+            fit = scale.fit_view(rgb, mask, cam, ref["type"], up=ups[stem], params=params)
+        except ValueError:
+            continue
+        fits.append({"name": stem, "K": cam.calibration_matrix(), "cam_from_world": w2c, **fit})
+    s, _, _ = metrics.umeyama(np.array(src), np.array(dst))
+    return fit3d(fits, ref, s)
+
+
+def summarize_3d(rows: list[dict[str, Any]], kind: str, cams: str) -> dict[str, Any]:
+    fs = [
+        r["fit3d"][cams]
+        for r in rows
+        if (r["reference"] == "card") == (kind == "card") and cams in r["fit3d"]
+    ]
+    ok = [f for f in fs if "error" not in f]
+    if not ok:
+        return {"series": len(fs), "ok": 0}
+    err = np.array([f["scale_err_pct"] for f in ok])  # (séries, 1 ou 2)
+    a = np.abs(err)
+    return {
+        "series": len(fs),
+        "ok": len(ok),
+        "scale_err_pct": {
+            "median": np.round(np.median(a, 0), 4).tolist(),
+            "max": np.round(a.max(0), 4).tolist(),
+            "mean_signed": np.round(err.mean(0), 4).tolist(),
+        },
+        "kept_failed": sum(len(f.get("kept_failed", [])) for f in ok),
+        "rejected_ok": sum(len(f.get("rejected_ok", [])) for f in ok),
+    }
 
 
 def summarize(rows: list[dict[str, Any]], kind: str) -> dict[str, Any]:
@@ -152,8 +232,13 @@ def main() -> None:
         r = evaluate(s)
         rows.append(r)
         ok = [v for v in r["views"] if "error" not in v and not v["failed"]]
-        print(f"{s} ({r['reference']}) : {len(ok)}/{len(r['views'])} vues, {time.perf_counter() - t0:.0f} s")
+        f3 = {c: f.get("scale_err_pct", f.get("error")) for c, f in r["fit3d"].items()}
+        print(
+            f"{s} ({r['reference']}) : {len(ok)}/{len(r['views'])} vues, 3D {f3}, {time.perf_counter() - t0:.0f} s"
+        )
     summary = {k: summarize(rows, k) for k in ("coin", "card")}
+    for k in ("coin", "card"):
+        summary[k]["fit3d"] = {c: summarize_3d(rows, k, c) for c in ("exact", "ba")}
     print("résumé :", json.dumps(summary, ensure_ascii=False))
     if a.no_save:
         return
@@ -164,7 +249,8 @@ def main() -> None:
         "date": time.strftime("%Y-%m-%d"),
         "commit": commit.stdout.strip(),
         "method": "scale.fit_view : arête haute par rayons (silhouette côté éloigné, modèle de tranche côté caméra), "
-        "masques SAM de `segment`, caméras et normale de table exactes",
+        "masques SAM de `segment`, normale de table exacte ; puis scale.fit_circle / fit_rectangle (caméras exactes, "
+        "et caméras `ba` alignées par similitude des centres)",
         "params": scale.PARAMS,
         "summary": summary,
         "series": rows,
