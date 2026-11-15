@@ -287,3 +287,208 @@ def fit_view(
         "rms_px": round(float(np.sqrt((r**2).mean())), 4),
         "points": pts[inl],
     }
+
+
+# --- Ajustement 3D sur plusieurs vues ---------------------------------------------------------------------------
+# Vues : dicts {"name", "K" (3, 3), "cam_from_world" (3, 4), et "ellipse" (pièce) ou "corners" (carte)}, pixels
+# sans distorsion (sortie de `fit_view`). Unités du monde : celles des poses (`sparse/`, unités VGGT).
+FIT3D: dict[str, Any] = {
+    "huber_px": 1.0,  # perte de Huber sur les résidus
+    "view_rms_px": 0.5,  # vue écartée si son rms dépasse max(view_rms_px, view_rms_rel × médiane des vues gardées)
+    "view_rms_rel": 3.0,
+    "max_rms_px": 1.5,  # échec si le rms médian des vues gardées le dépasse (caméras exactes : 0,16 à 1,1 px)
+    "min_views": {"coin": 5, "card": 3},
+}
+
+
+def _lm(f: Any, x: np.ndarray, iters: int = 100) -> np.ndarray:
+    """Levenberg-Marquardt, jacobien par différences finies (x normalisé : composantes d'ordre 1)."""
+    r = f(x)
+    cost, lam = r @ r, 1e-3
+    for _ in range(iters):
+        J = np.stack([(f(x + h) - r) / 1e-7 for h in np.eye(len(x)) * 1e-7], 1)
+        A, g = J.T @ J, J.T @ r
+        while True:
+            dx = np.linalg.solve(A + lam * np.diag(np.diag(A) + 1e-12), -g)
+            r2 = f(x + dx)
+            if (c2 := r2 @ r2) < cost:
+                x, r, cost, lam = x + dx, r2, c2, lam / 3
+                break
+            lam *= 4
+            if lam > 1e10:
+                return x
+        if np.abs(dx).max() < 1e-10:
+            break
+    return x
+
+
+def _huber(r: np.ndarray, d: float) -> np.ndarray:
+    """Résidus transformés dont la somme des carrés est la perte de Huber (seuil d)."""
+    a = np.abs(r)
+    return np.where(a <= d, r, np.sign(r) * np.sqrt(np.maximum(2 * d * a - d * d, 0)))
+
+
+def _center(view: dict[str, Any]) -> np.ndarray:
+    P = np.asarray(view["cam_from_world"], np.float64)
+    return -P[:, :3].T @ P[:, 3]
+
+
+def _homography(view: dict[str, Any], C: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Plan (C ; u, v) → pixels sans distorsion : (x, y, 1) ↦ K·(R·(C + x·u + y·v) + t)."""
+    P = np.asarray(view["cam_from_world"], np.float64)
+    return np.asarray(view["K"]) @ np.c_[P[:, :3] @ u, P[:, :3] @ v, P[:, :3] @ C + P[:, 3]]
+
+
+def _rays(view: dict[str, Any], px: np.ndarray) -> np.ndarray:
+    """Directions monde (non normées) des rayons passant par les pixels `px` (N, 2)."""
+    P = np.asarray(view["cam_from_world"], np.float64)
+    return (P[:, :3].T @ np.linalg.solve(view["K"], np.c_[px, np.ones(len(px))].T)).T
+
+
+def _ray_point(views: list[dict[str, Any]], px: list[np.ndarray]) -> np.ndarray:
+    """Point 3D le plus proche (moindres carrés) des rayons passant par `px` dans chaque vue."""
+    A, b = np.zeros((3, 3)), np.zeros(3)
+    for v, p in zip(views, px, strict=True):
+        d = _rays(v, np.asarray(p, np.float64)[None])[0]
+        M = np.eye(3) - np.outer(d, d) / (d @ d)
+        A, b = A + M, b + M @ _center(v)
+    return np.linalg.solve(A, b)
+
+
+def _up(views: list[dict[str, Any]], C: np.ndarray) -> np.ndarray:
+    """Normale initiale : direction moyenne vers les caméras (toutes du même côté de la table)."""
+    m = np.mean([(o - C) / np.linalg.norm(o - C) for o in map(_center, views)], 0)
+    return m / np.linalg.norm(m)
+
+
+def _basis(n: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    u = np.cross(n, np.eye(3)[np.argmin(np.abs(n))])
+    u /= np.linalg.norm(u)
+    return u, np.cross(n, u)
+
+
+def _robust_views(
+    views: list[dict[str, Any]], kind: str, residuals: Any, x: np.ndarray, params: dict[str, Any] | None
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Ajustement sur les vues gardées, puis rejet des vues incohérentes (rms trop grand) jusqu'à stabilité.
+    `residuals(x, i)` : résidus (px) de la vue i. Retourne x, le rms par vue et le masque des vues gardées."""
+    p = {**FIT3D, **(params or {})}
+    keep = np.ones(len(views), bool)
+    for _ in range(10):
+        if keep.sum() < p["min_views"][kind]:
+            raise ValueError(f"trop peu de vues cohérentes ({int(keep.sum())} < {p['min_views'][kind]})")
+        idx = np.flatnonzero(keep)
+        x = _lm(lambda y, idx=idx: _huber(np.concatenate([residuals(y, i) for i in idx]), p["huber_px"]), x)
+        rms = np.array([np.sqrt(np.mean(residuals(x, i) ** 2)) for i in range(len(views))])
+        new = rms < max(p["view_rms_px"], p["view_rms_rel"] * float(np.median(rms[keep])))
+        if (new == keep).all():
+            break
+        keep = new
+    # Le rejet relatif ne voit rien si toutes les vues sont fausses (poses `ba` incohérentes) : garde-fou absolu.
+    if (med := float(np.median(rms[keep]))) > p["max_rms_px"]:
+        raise ValueError(f"vues incohérentes entre elles (rms médian {med:.2f} px > {p['max_rms_px']} px)")
+    return x, rms, keep
+
+
+def _views_out(views: list[dict[str, Any]], rms: np.ndarray, keep: np.ndarray) -> dict[str, Any]:
+    return {
+        "views": [v["name"] for v, k in zip(views, keep, strict=True) if k],
+        "rejected": [v["name"] for v, k in zip(views, keep, strict=True) if not k],
+        "rms_px": {v["name"]: round(float(e), 4) for v, e in zip(views, rms, strict=True)},
+    }
+
+
+def fit_circle(
+    views: list[dict[str, Any]], kind: str = "coin2", params: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Cercle 3D (centre, normale, rayon) dont les projections reproduisent au mieux les ellipses par vue
+    (arête de la face haute). Résidus : distance de Sampson de 64 points de chaque ellipse observée à la conique
+    projetée (poids égal par vue). `mm_per_unit` : diamètre connu / diamètre ajusté."""
+    obs = [np.c_[ellipse_points(v["ellipse"], 1e9)[0], np.ones(64)] for v in views]  # 64 points par ellipse
+    C0 = _ray_point(views, [v["ellipse"][:2] for v in views])
+    n0 = _up(views, C0)
+    t1, t2 = _basis(n0)
+    depth = [(np.asarray(v["cam_from_world"])[2] @ [*C0, 1.0]) for v in views]
+    r0 = float(
+        np.median([max(v["ellipse"][2:4]) * z / v["K"][0][0] for v, z in zip(views, depth, strict=True)])
+    )
+
+    def unpack(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+        n = n0 + x[3] * t1 + x[4] * t2
+        return C0 + r0 * x[:3], n / np.linalg.norm(n), r0 * float(np.exp(x[5]))
+
+    def residuals(x: np.ndarray, i: int) -> np.ndarray:
+        C, n, r = unpack(x)
+        u, w = _basis(n)
+        Hi = np.linalg.inv(_homography(views[i], C, r * u, r * w))  # plan en rayons : cercle unité
+        g = obs[i] @ (Hi.T @ np.diag([1.0, 1.0, -1.0]) @ Hi)
+        return (g * obs[i]).sum(1) / (2 * np.linalg.norm(g[:, :2], axis=1))
+
+    x, rms, keep = _robust_views(views, "coin", residuals, np.zeros(6), params)
+    C, n, r = unpack(x)
+    return {
+        "center": C.tolist(),
+        "normal": n.tolist(),
+        "radius": r,
+        "mm_per_unit": REFERENCES[kind]["diameter"] / (2 * r),
+        **_views_out(views, rms, keep),
+    }
+
+
+def fit_rectangle(views: list[dict[str, Any]], params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Rectangle 3D (centre, axes, côtés libres) dont les coins projetés reproduisent les coins observés
+    (intersections des 4 droites par vue). `mm_per_unit` : deux estimations, grand côté et petit côté."""
+    obs = [np.asarray(v["corners"], np.float64) for v in views]
+    # Intersection des diagonales : projection exacte du centre du rectangle.
+    diag = [np.cross(np.cross([*c[0], 1], [*c[2], 1]), np.cross([*c[1], 1], [*c[3], 1])) for c in obs]
+    C0 = _ray_point(views, [d[:2] / d[2] for d in diag])
+    n0 = _up(views, C0)
+    # Coins de la vue où la carte est la plus grande, remontés sur le plan (C0, n0) : axes et côtés initiaux.
+    ref = int(np.argmax([np.ptp(c, 0).max() for c in obs]))
+    o, d = _center(views[ref]), _rays(views[ref], obs[ref])
+    X = o + d * (((C0 - o) @ n0) / (d @ n0))[:, None]
+    a1 = X[1] - X[0] + X[2] - X[3]
+    a1 -= (a1 @ n0) * n0
+    a1 /= np.linalg.norm(a1)
+    R0 = np.c_[a1, np.cross(n0, a1), n0]
+    w0 = float(np.linalg.norm(X[1] - X[0]) + np.linalg.norm(X[2] - X[3])) / 2
+    h0 = float(np.linalg.norm(X[2] - X[1]) + np.linalg.norm(X[3] - X[0])) / 2
+    local = np.array([[-1.0, -1], [1, -1], [1, 1], [-1, 1]]) / 2
+
+    def unpack(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, float, float]:
+        return (
+            C0 + w0 * x[:3],
+            R0 @ cv2.Rodrigues(x[3:6])[0],
+            w0 * float(np.exp(x[6])),
+            h0 * float(np.exp(x[7])),
+        )
+
+    def project(x: np.ndarray, i: int) -> np.ndarray:
+        C, R, w, h = unpack(x)
+        q = np.c_[local * [w, h], np.ones(4)] @ _homography(views[i], C, R[:, 0], R[:, 1]).T
+        return q[:, :2] / q[:, 2:]
+
+    def match(x: np.ndarray) -> None:  # ordre des coins observés (sens et départ) sur la projection courante
+        for i, c in enumerate(obs):
+            q = project(x, i)
+            cands = [np.roll(g, k, 0) for g in (c, c[::-1]) for k in range(4)]
+            obs[i] = cands[int(np.argmin([np.linalg.norm(g - q, axis=1).sum() for g in cands]))]
+
+    def residuals(y: np.ndarray, i: int) -> np.ndarray:
+        return (project(y, i) - obs[i]).ravel()
+
+    x = np.zeros(8)
+    for _ in range(2):  # l'appariement initial peut se tromper sur les vues éloignées de la vue de départ
+        match(x)
+        x, rms, keep = _robust_views(views, "card", residuals, x, params)
+    C, R, w, h = unpack(x)
+    (long, ax), (short, _) = sorted([(w, R[:, 0]), (h, R[:, 1])], key=lambda t: -t[0])
+    dims = REFERENCES["card"]
+    return {
+        "center": C.tolist(),
+        "normal": R[:, 2].tolist(),
+        "axis_long": ax.tolist(),
+        "size": [long, short],
+        "mm_per_unit": [dims["width"] / long, dims["height"] / short],
+        **_views_out(views, rms, keep),
+    }

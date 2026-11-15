@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import pycolmap
 import pytest
@@ -70,3 +71,76 @@ def test_card_corners():
 def test_empty_mask_raises():
     with pytest.raises(ValueError):
         scale.fit_view(np.zeros((50, 50, 3), np.uint8), np.zeros((50, 50), bool), camera(50, 50), "coin1")
+
+
+def look_at(eye, target=(0.0, 0.0, 0.0)):
+    """cam_from_world (3, 4) OpenCV : caméra en `eye` regardant `target`, z monde vers le haut."""
+    z = np.subtract(target, eye) / np.linalg.norm(np.subtract(target, eye))
+    x = np.cross(z, [0.0, 0.0, 1.0])
+    x /= np.linalg.norm(x)
+    R = np.stack([x, np.cross(z, x), z])
+    return np.c_[R, -R @ eye]
+
+
+def views_around(n=12, unit=0.01, seed=1):
+    """Caméras à 30–70° d'élévation, 300 mm, monde exprimé en unités de `unit` mm (comme les unités VGGT)."""
+    rng = np.random.default_rng(seed)
+    K = np.array([[3000.0, 0, 2016], [0, 3000, 1512], [0, 0, 1]])
+    out = []
+    for i in range(n):
+        az, el = 2 * np.pi * i / n + rng.normal(0, 0.1), np.radians(rng.uniform(30, 70))
+        eye = 300 * np.array([np.cos(az) * np.cos(el), np.sin(az) * np.cos(el), np.sin(el)]) + [20, -10, 0]
+        out.append({"name": f"v{i}", "K": K, "cam_from_world": look_at(eye * unit, (0.0, 0.0, 0.0))})
+    return out
+
+
+def project(view, X):
+    P = view["cam_from_world"]
+    q = (X @ P[:, :3].T + P[:, 3]) @ view["K"].T
+    return q[:, :2] / q[:, 2:]
+
+
+def test_fit_circle_rejects_bad_views():
+    unit, r_mm = 0.01, scale.REFERENCES["coin2"]["diameter"] / 2
+    a = np.linspace(0, 2 * np.pi, 360, endpoint=False)
+    circle = np.c_[r_mm * np.cos(a) + 5, r_mm * np.sin(a) - 3, np.full(360, 2.2)] * unit
+    views = views_around(unit=unit)
+    rng = np.random.default_rng(2)
+    for i, v in enumerate(views):
+        (cx, cy), (w, h), t = cv2.fitEllipseDirect(project(v, circle).astype(np.float32))
+        k = 1.03 if i in (2, 7) else 1.0  # deux vues ratées : ellipse 3 % trop grande
+        v["ellipse"] = [cx + rng.normal(0, 0.1), cy + rng.normal(0, 0.1), k * w / 2, k * h / 2, t]
+    fit = scale.fit_circle(views, "coin2")
+    assert sorted(fit["rejected"]) == ["v2", "v7"], fit["rms_px"]
+    assert abs(fit["mm_per_unit"] * unit - 1) < 5e-4, fit["mm_per_unit"]
+    np.testing.assert_allclose(fit["center"], np.array([5, -3, 2.2]) * unit, atol=0.05 * unit)
+    assert abs(fit["normal"][2]) > 0.9999
+
+
+def test_fit_rectangle_corner_order_and_scale():
+    unit, d = 0.01, scale.REFERENCES["card"]
+    yaw = np.radians(25)
+    R = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
+    local = np.array([[1, 1], [-1, 1], [-1, -1], [1, -1]]) * [d["width"] / 2, d["height"] / 2]
+    corners = np.c_[local @ R.T + [10, 4], np.full(4, 0.76)] * unit
+    views = views_around(unit=unit, seed=3)
+    rng = np.random.default_rng(4)
+    for i, v in enumerate(views):
+        c = project(v, corners) + rng.normal(0, 0.1, (4, 2))
+        c = np.roll(c[:: 1 if i % 2 else -1], i, 0)  # ordre arbitraire, comme `quad_corners`
+        v["corners"] = (c - c.mean(0)) * (1.04 if i == 5 else 1.0) + c.mean(0)
+    fit = scale.fit_rectangle(views)
+    assert fit["rejected"] == ["v5"], fit["rms_px"]
+    np.testing.assert_allclose(np.array(fit["mm_per_unit"]) * unit, 1, atol=5e-4)
+
+
+def test_fit_circle_fails_on_inconsistent_poses():
+    unit, r_mm = 0.01, scale.REFERENCES["coin2"]["diameter"] / 2
+    a = np.linspace(0, 2 * np.pi, 360, endpoint=False)
+    circle = np.c_[r_mm * np.cos(a), r_mm * np.sin(a), np.full(360, 2.2)] * unit
+    views = views_around(unit=unit)
+    for i, v in enumerate(views):
+        (cx, cy), (w, h), t = cv2.fitEllipseDirect(project(v, circle).astype(np.float32))
+        v["ellipse"] = [cx + 8 * (-1) ** i, cy, w / 2, h / 2, t]  # toutes décalées : aucune vue de référence
+    with pytest.raises(ValueError, match="incohérentes"):
+        scale.fit_circle(views, "coin2")
