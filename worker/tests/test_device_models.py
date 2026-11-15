@@ -39,3 +39,15 @@ def test_vggt_bf16_runs():
     with torch.no_grad(), device.autocast(info):
         out = model(torch.rand(2, 3, 294, 518, device=info.device))
     assert out["pose_enc"].shape == (1, 2, 9) and torch.isfinite(out["depth"]).all()
+
+
+@pytest.mark.gpu
+def test_cuda_memory_capped_below_free():
+    import torch
+
+    info = device.detect()
+    _, total = torch.cuda.mem_get_info()
+    assert info.budget_mb is not None and 0 < info.budget_mb < total / 2**20
+    assert device.detect().budget_mb == info.budget_mb  # mesuré une seule fois par processus
+    with pytest.raises(torch.OutOfMemoryError):  # au-delà du plafond : erreur, pas de débordement
+        torch.empty(int((info.budget_mb + 64) * 2**20), dtype=torch.uint8, device=info.device)

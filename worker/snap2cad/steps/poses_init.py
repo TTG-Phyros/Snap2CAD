@@ -33,9 +33,9 @@ PARAMS: dict[str, Any] = {
     "conf_percentile": 50.0,  # points gardés pour le PLY/GLB : confiance au-dessus de ce centile
     "max_points": 1_000_000,
 }
-# shortcut: N₈ (RTX 4060) pas encore mesuré, on applique N₆ = 20 aux deux profils ; au-delà il faudra
-# le traitement par lots + ajustement global (plan R5). Mettre à jour après la mesure sur la 4060.
-MAX_IMAGES = {"full": 20, "degraded": 20}
+# Mesuré sous le plafond VRAM de device.cap_cuda_memory (docs/benchmarks/M0-vggt.md) : N₈ = 28 sur la 4060.
+# shortcut: N₆ = 20 date d'avant le plafond, à remesurer sur la 3060. Au-delà : lots + ajustement global (plan R5).
+MAX_IMAGES = {"full": 28, "degraded": 20}
 
 
 def preprocess(paths: list[Path]) -> tuple[np.ndarray, np.ndarray]:

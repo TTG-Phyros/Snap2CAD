@@ -100,5 +100,148 @@
         "fits": false
       }
     ]
+  },
+  {
+    "gpu": "NVIDIA GeForce RTX 4060",
+    "memory_gib": 8.0,
+    "profile": "full",
+    "dataset": "dtu_scan1",
+    "image_shape": [
+      392,
+      518
+    ],
+    "torch": "2.7.1+cu128",
+    "heads": "camera+depth",
+    "budget_mb": 6851,
+    "budget_rule": "VRAM libre au lancement - 256 Mo, plafond par processus",
+    "max_n_fitting": 36,
+    "rows": [
+      {
+        "n_images": 4,
+        "time_s": 0.86,
+        "peak_mb": 3730,
+        "reserved_mb": 5346,
+        "fits": true
+      },
+      {
+        "n_images": 8,
+        "time_s": 1.79,
+        "peak_mb": 4771,
+        "reserved_mb": 6146,
+        "fits": true
+      },
+      {
+        "n_images": 12,
+        "time_s": 2.83,
+        "peak_mb": 4909,
+        "reserved_mb": 6402,
+        "fits": true
+      },
+      {
+        "n_images": 16,
+        "time_s": 4.4,
+        "peak_mb": 5058,
+        "reserved_mb": 6618,
+        "fits": true
+      },
+      {
+        "n_images": 20,
+        "time_s": 5.46,
+        "peak_mb": 5199,
+        "reserved_mb": 6408,
+        "fits": true
+      },
+      {
+        "n_images": 24,
+        "time_s": 7.56,
+        "peak_mb": 5353,
+        "reserved_mb": 6670,
+        "fits": true
+      },
+      {
+        "n_images": 28,
+        "time_s": 9.34,
+        "peak_mb": 5491,
+        "reserved_mb": 6476,
+        "fits": true
+      },
+      {
+        "n_images": 32,
+        "time_s": 10.73,
+        "peak_mb": 5641,
+        "reserved_mb": 6590,
+        "fits": true
+      },
+      {
+        "n_images": 36,
+        "time_s": 12.75,
+        "peak_mb": 5781,
+        "reserved_mb": 6420,
+        "fits": true
+      },
+      {
+        "n_images": 40,
+        "fits": false
+      }
+    ]
+  },
+  {
+    "gpu": "NVIDIA GeForce RTX 4060",
+    "memory_gib": 8.0,
+    "profile": "full",
+    "dataset": "kitchen",
+    "image_shape": [
+      350,
+      518
+    ],
+    "torch": "2.7.1+cu128",
+    "heads": "camera+depth",
+    "budget_mb": 6851,
+    "budget_rule": "VRAM libre au lancement - 256 Mo, plafond par processus",
+    "max_n_fitting": 25,
+    "rows": [
+      {
+        "n_images": 4,
+        "time_s": 0.76,
+        "peak_mb": 3623,
+        "reserved_mb": 5020,
+        "fits": true
+      },
+      {
+        "n_images": 8,
+        "time_s": 1.73,
+        "peak_mb": 4544,
+        "reserved_mb": 6508,
+        "fits": true
+      },
+      {
+        "n_images": 12,
+        "time_s": 2.76,
+        "peak_mb": 4672,
+        "reserved_mb": 6732,
+        "fits": true
+      },
+      {
+        "n_images": 16,
+        "time_s": 3.71,
+        "peak_mb": 4804,
+        "reserved_mb": 6284,
+        "fits": true
+      },
+      {
+        "n_images": 20,
+        "time_s": 5.14,
+        "peak_mb": 4931,
+        "reserved_mb": 6494,
+        "fits": true
+      },
+      {
+        "n_images": 25,
+        "time_s": 6.86,
+        "peak_mb": 5097,
+        "reserved_mb": 6802,
+        "fits": true
+      }
+    ]
   }
 ]
