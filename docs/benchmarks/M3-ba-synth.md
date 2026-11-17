@@ -125,7 +125,7 @@ La reprojection ne voit pas ces échecs (0,49 à 0,63 px sur les quatre). Deux c
 | Normale de la table, erreur médiane | — | 0,38° (pièce), 0,31° (carte) |
 
 - Le garde-fou de 1,5 px de `scale` refuse encore des séries aux poses justes à ≈ 1 mm (`Caddy__base` 2,15 px,
-  `Logitech__base` 1,57 px, `Hammer__base` 3,27 px) : à examiner pour la décision M4 (#51), hors de ce ticket.
+  `Logitech__base` 1,57 px, `Hammer__base` 3,27 px) : à examiner pour la décision M4 (#51), suivi dans #101.
 - Parmi les 11 séries qui aboutissent, `Ecoforms__noir` (+5,29 %) et `Caddy__noir` (+0,94 %) passent les contrôles de
   `scale`, mais `ba` les signale (`pose_drift`). Sur les 9 autres : erreur d'échelle de −0,85 % à +0,30 % (carte : grand côté), médiane |0,18 %|.
 
@@ -148,5 +148,5 @@ Sans focale EXIF, seuls les seuils changent (rejet à 64 px, filtrage final à 1
 
 ## Suites
 
-- `ba` : vues faiblement reliées (séries `noir`, secteur sans photo) → ticket séparé.
-- `scale` : garde-fou de 1,5 px trop strict avec les poses `ba` actuelles → ticket séparé, lié à #51.
+- `ba` : vues faiblement reliées (séries `noir`, secteur sans photo) → #100.
+- `scale` : garde-fou de 1,5 px trop strict avec les poses `ba` actuelles → #101, lié à #51.
