@@ -59,18 +59,18 @@ Cotes prioritaires : hors-tout, diamètres, entraxes.
 | Interface | Electron + React + three.js. Worker Python local en HTTP + WebSocket. PySide6 en repli si l'affichage des gros nuages pose problème |
 | Distribution | Installeur léger. Poids téléchargés au premier lancement, avec reprise. **Fonctionnement entièrement hors ligne ensuite.** Pas de signature de code en v1 |
 | Prise de vue | Smartphone iPhone ou Android, objectif principal uniquement. Aucune calibration demandée à l'utilisateur. Import d'un dossier de photos, puis import vidéo plus tard |
-| Échelle | Objet de référence posé à plat, visible sur au moins 5 photos : pièce de 2 € (défaut), pièce de 1 €, carte ID-1 (recommandée au-delà de 15 cm). L'utilisateur clique dessus, SAM le segmente |
+| Échelle | Objet de référence posé à plat, visible sur au moins 5 photos : **carte ID-1 obligatoire** (décision M4 : les pièces de 2 € et de 1 € n'atteignent pas la précision visée, [M4-decision](docs/benchmarks/M4-decision.md)). L'utilisateur clique dessus, SAM le segmente |
 | Repère | Plan de la table, Z vers le haut, unités en **mm** |
 | Dessous de l'objet | Deux sessions (objet retourné) puis fusion, ou une seule session avec le dessous « non couvert ». C'est l'utilisateur qui choisit |
 | Couverture | Une zone est couverte si au moins 3 caméras la voient avec un angle de triangulation d'au moins 15°. Couverture suffisante au-delà de 90 % de la surface. D'abord guider la reprise de photos, la complétion n'est qu'un repli signalé |
 | Incertitude | Quatre sources (confiance VGGT, nombre de vues, erreur de reprojection, écart aux cotes) combinées en mm. Export par sommet (PLY), en couleurs (GLB) et en rapport JSON |
-| Cotes au pied à coulisse | Avec une seule cote : vérification. À partir de deux : recalage d'échelle par moindres carrés, résidus affichés. Désignation : deux points, cercle ajusté (diamètre), deux plans (épaisseur) |
+| Cotes au pied à coulisse | **Obligatoires** (décision M4). Avec une seule cote : vérification. À partir de deux : recalage d'échelle par moindres carrés, résidus affichés. Désignation : deux points, cercle ajusté (diamètre), deux plans (épaisseur) |
 | Outils de mesure | Distance et diamètre au minimum |
 | Objets souples | Choix de l'utilisateur en v1 |
 | Détourage | SAM 2.1 : clic sur la 1ʳᵉ photo puis propagation. BiRefNet automatique en repli |
 | STEP en mode Référence | STEP facetté. Point2CAD abandonné en v1 |
 | Support texturé, spray de scan | Support texturé seulement si nécessaire. Spray de scan conseillé mais optionnel |
-| Échec de la précision au jalon M4 | Imposer la carte bancaire et des cotes au pied à coulisse |
+| Échec de la précision au jalon M4 | Imposer la carte bancaire et des cotes au pied à coulisse. **Appliqué** : cible de la pièce non atteinte sur le synthétique ([M4-decision](docs/benchmarks/M4-decision.md)) |
 | Fusion de sessions | Alignement manuel par 3 points accepté en repli |
 | Orchestration | Un processus par étape. Dossier projet versionné par `project.json` (paramètres et hash des entrées) pour ne relancer que ce qui a changé |
 | Environnement Python | Un seul environnement, repli sur deux si besoin |
@@ -500,6 +500,8 @@ Aucun dataset réel ne contient de pièce de 2 € ni de carte bancaire. L'erreu
 **Critères (synthétique) :** erreur d'échelle relative < 0,15 % (pièce) et < 0,08 % (carte).
 
 **Décision :** si la cible n'est pas atteinte → **carte obligatoire et cotes au pied à coulisse obligatoires** (décision déjà validée). Il reste à revalider sur photos réelles dès que possible.
+
+**Résultat ([M4-decision](docs/benchmarks/M4-decision.md)) :** pièce non atteinte (médiane 0,19 % avec les caméras exactes, 0,38 % avec les poses `ba`). Carte atteinte en médiane (0,04 % et 0,03 %, au plus 0,095 %). La décision s'applique : carte et cotes au pied à coulisse obligatoires.
 
 ### M5 — Reconstruction dense, maillage, exports · L
 **Tâches :**

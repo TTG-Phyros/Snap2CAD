@@ -167,7 +167,7 @@ flowchart TB
     subgraph REF["Objet de référence (choisi dans une liste)"]
         R1[Pièce 2 € · Ø 25,75 mm · ép. 2,20 mm]
         R2[Pièce 1 € · Ø 23,25 mm]
-        R3[Carte ID-1 · 85,60 × 53,98 mm<br/>recommandée au-delà de 15 cm]
+        R3[Carte ID-1 · 85,60 × 53,98 mm<br/>obligatoire · décision M4]
     end
 
     REF --> K[Clic sur une photo → SAM 2.1<br/>masque sur toutes les vues]
