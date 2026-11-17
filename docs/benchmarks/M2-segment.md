@@ -1,4 +1,4 @@
-# M2 — Détourage SAM 2.1 en mode vidéo, correction manuelle et repli guidé en 3D
+# M2 — Détourage SAM 2.1 en mode vidéo, correction manuelle, repli guidé en 3D et repli BiRefNet
 
 Mesures brutes : [`segment.json`](segment.json), produites par `python -m tools.eval.segment`.
 Conditions : étape `segment` (SAM 2.1 `base_plus`, profil 6 Go), 20 vues réparties sur chacune des 30 séries
@@ -106,3 +106,64 @@ Observations :
   test de visibilité.
 - Temps de l'étape : 14 s par passage en médiane, contre 9 s (relances comprises).
 - Les masques de `datasets/_eval` ont changé (référence surtout) : `scale.json` (`6e542c6`) a été mesuré avec les anciens.
+
+## Avec BiRefNet en repli automatique (#39)
+
+Mesures brutes : [`birefnet.json`](birefnet.json) (BiRefNet seul, `python -m tools.eval.birefnet`) et entrée `dd5e7fc` de
+[`segment.json`](segment.json), comparée à `f774e8e` (repli 3D seul) et `f8b7f3c` (SAM seul). Mêmes séries, mêmes vues,
+mêmes clics simulés, même GPU.
+
+**BiRefNet seul** (objet saillant, 1024 px, seuil 0,5), sur les 579 vues où l'objet est visible :
+
+| Variante | IoU moyenne | dont plus grande composante | Vues perdues | Référence prise pour l'objet | VRAM (pic) |
+|---|---:|---:|---:|---:|---:|
+| BiRefNet (Swin-L) | 0,966 | **0,981** | **6** | 196 vues | 3,5 Go |
+| BiRefNet_lite (Swin-T) | 0,936 | 0,968 | 12 | 281 vues | 1,7 Go |
+
+- La pièce ou la carte, posée à côté, est souvent incluse dans le masque : on ne garde que la plus grande composante
+  qui ne se confond pas avec la référence vue par SAM. Les 6 vues perdues sont toutes sur l'ouvre-boîte OXO, où la carte
+  est plus grande que l'objet à l'image.
+- Variante retenue : **BiRefNet complet** sur les deux profils. Il est meilleur que la variante lite (6 vues perdues
+  contre 12) et tient sur 6 Go, parce qu'il tourne avant que SAM soit chargé. Seule la variante complète est au
+  manifeste. Le temps mesuré par vue (0,4 à 2 s) varie selon la charge de la machine : il n'est pas fiable ici.
+- L'entrée de `birefnet.json` porte le commit `929a6c6` : le code mesuré était celui de `dd5e7fc`, pas encore committé.
+
+**Méthode** (`worker/snap2cad/steps/segment.py`, `worker/snap2cad/models/birefnet.py`) :
+- BiRefNet détoure chaque photo avant le chargement de SAM, pour que les deux modèles ne soient jamais en VRAM ensemble.
+- On ne s'y fie que s'il s'accorde avec le masque SAM des photos cliquées (IoU ≥ 0,8), sinon il détoure autre chose que
+  l'objet désigné. Il sert pour l'objet seulement : il ne voit pas la référence.
+- Après le repli 3D, une photo où SAM et BiRefNet divergent (IoU < 0,5), et que la géométrie ne juge pas correcte
+  (≥ 80 % des projections dans le masque), reçoit comme invite la boîte du masque BiRefNet. Celle-ci remplace une
+  éventuelle boîte reprojetée. Au plus 3 relances.
+- Code et poids publiés sur Hugging Face (révision `e2bf8e44`, licence MIT), SHA-256 au manifeste. Le code n'utilise
+  `transformers` que pour deux classes de base : une cale les remplace. Seule dépendance ajoutée : `timm`.
+
+**Avant correction manuelle** :
+
+| Objet | SAM seul | + repli 3D | + BiRefNet |
+|---|---:|---:|---:|
+| IoU moyenne | 0,927 | 0,958 | **0,974** |
+| Séries ≥ 0,9 | 24 / 30 | 27 / 30 | **29 / 30** |
+| Séries avec une vue perdue | 5 | 2 | **0** |
+| Vues perdues (total) | 30 | 7 | **0** |
+
+**Après correction manuelle simulée** : objet 0,982 / 0,981 / 0,981 (30 séries ≥ 0,9, aucune perte dans les trois
+cas), avec 0,40 / 0,17 / **0,10** vue corrigée par série en moyenne. Référence 0,947 / 0,961 / 0,963, séries avec une
+vue perdue 5 / 4 / 3 (BiRefNet ne la traite pas : l'écart vient du masque de l'objet, qui sert au test de visibilité).
+
+Critère du ticket (pas de régression de l'IoU moyenne ; moins de vues perdues qu'avec SAM seul) : **atteint**.
+IoU avant correction 0,927 → 0,974, vues perdues 30 → 0. Après correction, l'IoU finale est égale à 0,001 près
+(0,982 → 0,981).
+
+Observations :
+- BiRefNet n'a relancé que 2 séries, celles où il le fallait. Il n'y a aucune relance à tort, et le garde-fou
+  d'accord avec la vue cliquée n'a coupé BiRefNet nulle part (IoU minimale 0,947).
+  - **Pot `noir`** (0 à 2 points `ba` par vue, repli 3D impossible) : 0,826 avec 2 vues perdues → **0,989 avec 0**,
+    une boîte.
+  - **Enceinte `noref`** : 0,673 avec 5 vues perdues (boîtes 3D tronquées, voir #105) → **0,985 avec 0**, trois
+    boîtes. La régression du repli 3D disparaît sur cette série.
+- La seule série encore sous 0,9 avant correction, l'enceinte `noir` (0,849), n'a aucune vue perdue : ses masques
+  sont partiels sans diverger assez de BiRefNet pour une relance.
+- **Temps de l'étape :** 35 s en médiane au premier passage, contre 14 s avec le repli 3D seul et 9 s avec SAM seul ;
+  161 s au pire (enceinte `noref` : 3 relances 3D puis 3 relances BiRefNet). BiRefNet coûte environ 1 s par photo
+  sur la 3060 Laptop, et chaque relance refait toute la propagation.
