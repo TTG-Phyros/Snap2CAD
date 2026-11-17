@@ -158,7 +158,7 @@ VRAM et temps sont des **estimations à mesurer au jalon M0**.
 |---|---|---|---|---|---|
 | 1 | `import` | Pillow, pillow-heif, exifread | CPU | Dossier de photos | `images/` normalisées, `exif.json`, contrôles |
 | 2 | `poses_init` | VGGT-1B, bf16 | GPU | Images entières (518 px) | `vggt/predictions.npz` : poses, intrinsèques, profondeur, confiance |
-| 3 | `segment` | SAM 2.1, repli BiRefNet | GPU | Clics : objet, référence | `masks/object/*.png`, `masks/reference/*.png` |
+| 3 | `segment` | SAM 2.1, repli guidé en 3D (points de `ba`, qui n'utilise pas les masques : `segment` tourne après `ba`), repli BiRefNet | GPU | Clics : objet, référence ; `sparse/` si présent | `masks/object/*.png`, `masks/reference/*.png` |
 | 4 | `ba` | pycolmap : ALIKED/SIFT en pleine résolution, ajustement de faisceaux | CPU (+GPU pour les points) | Images, poses VGGT, EXIF | `sparse/` (format COLMAP), `ba_report.json` |
 | 5 | `scale` | OpenCV (ellipse et rectangle sous-pixel), triangulation, RANSAC du plan | CPU | Masques de référence, `sparse/` | `scale.json` : facteur, σ, repère monde |
 | 6 | `dense` | COLMAP PatchMatch (CUDA) ou OpenMVS (Mac) | GPU / CPU | Images non distordues, masques objet | `dense/fused.ply` + confiance |

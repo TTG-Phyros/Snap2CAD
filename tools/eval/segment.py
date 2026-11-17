@@ -5,6 +5,7 @@ Clics simulés comme un utilisateur, sur la première photo (ordre EXIF) où la 
 point au cœur de la cible, puis des clics de correction au cœur de la plus grande erreur (SAM en mode
 image) jusqu'à IoU ≥ 0,95, au plus 5 clics. Puis correction manuelle simulée : tant qu'une vue reste sous
 IoU 0,8, l'utilisateur clique de même sur la pire (au plus 3 vues par cible) et relance l'étape.
+Projets existants gardés (`exif.json` présent) : `sparse/` de `tools.eval.poses --ba` active le repli guidé en 3D.
 Par défaut : toutes les séries de datasets/synth.
 Résultats ajoutés dans docs/benchmarks/segment.json.
 """
@@ -90,8 +91,10 @@ def evaluate(
 ) -> dict[str, Any]:
     scene = datasets.synth(SYNTH, series)
     root = work / f"{scene.name}.s2c"
-    shutil.rmtree(root, ignore_errors=True)
-    datasets.write_project(scene, root, n)
+    # Projet existant (mêmes vues) : on le garde, `sparse/` de l'étape `ba` sert au repli guidé en 3D.
+    if not (root / "exif.json").exists():
+        shutil.rmtree(root, ignore_errors=True)
+        datasets.write_project(scene, root, n)
     project = Project(root)
     import_.run(project)
     frames = segment.frame_order(json.loads((root / "exif.json").read_text("utf-8")))
@@ -119,7 +122,7 @@ def evaluate(
                 for s in stems
                 if (gt[s] == LABELS[target]).mean() >= segment.PARAMS["min_area_ratio"]  # IoU indéfinie sinon
             }
-        runs.append((rec["duration_s"], scores))
+        runs.append((rec["duration_s"], scores, rec["result"].get("guided_3d") or {}))
         todo = {
             t: v
             for t in clicks
@@ -145,6 +148,7 @@ def evaluate(
             "clicks": len(tc),
             "clicked_iou": round(final[tc[0]["image"][:-4]], 4),
             "corrected_views": corrected[target],
+            "guided_3d": sorted(runs[0][2].get(target, {})),  # photos relancées par le repli 3D, 1er passage
             **stats(final),
             "before_correction": stats(first),
         }
@@ -168,7 +172,7 @@ def main() -> None:
         print(
             f"{s:40s}"
             + "".join(
-                f"  {t} {r[t]['clicks']} clic(s) {len(r[t]['corrected_views'])} vue(s) corrigée(s) "
+                f"  {t} {r[t]['clicks']} clic(s) repli {len(r[t]['guided_3d'])} {len(r[t]['corrected_views'])} vue(s) corrigée(s) "
                 f"moy {r[t]['before_correction']['iou_mean']:.3f} -> {r[t]['iou_mean']:.3f} "
                 f"min {r[t]['iou_min']:.3f} perdues {len(r[t]['before_correction']['lost'])} -> {len(r[t]['lost'])}"
                 for t in LABELS
@@ -200,7 +204,7 @@ def main() -> None:
         "date": time.strftime("%Y-%m-%d"),
         "commit": commit.stdout.strip(),
         "gpu": info.name,
-        "method": f"SAM 2.1 vidéo (segment, {name}), clics simulés sur la 1re vue (≤ {MAX_CLICKS}, IoU ≥ {CLICK_IOU}), "
+        "method": f"SAM 2.1 vidéo + repli guidé en 3D si sparse/ (segment, {name}), clics simulés sur la 1re vue (≤ {MAX_CLICKS}, IoU ≥ {CLICK_IOU}), "
         f"puis correction des vues sous IoU {CORRECT_IOU} (≤ {MAX_CORRECTIONS} par cible)",
         "n_views": a.n,
         "summary": summary,
