@@ -146,8 +146,13 @@ def fit3d(fits: list[dict[str, Any]], ref: dict[str, Any], mm_per_unit: float) -
     except ValueError as e:
         return {"error": str(e)}
     err = (np.atleast_1d(f["mm_per_unit"]) / mm_per_unit - 1) * 100
+    s = float(np.atleast_1d(f["mm_per_unit"])[0])
     return {
         "scale_err_pct": np.round(err, 4).tolist(),  # pièce : diamètre ; carte : grand puis petit côté
+        "sigma_rel_pct": [round(scale.sigma_rel(ref["type"], f) * 100, 4)],  # jackknife ⊕ plancher
+        "sigma_views_pct": np.round(np.atleast_1d(f["sigma_rel"]) * 100, 4).tolist(),  # jackknife seul
+        # contrôles avec la table exacte (z = 0, monde en mm)
+        "checks": {k: c["value"] for k, c in scale.checks(ref["type"], f, np.array([0.0, 0, 1]), 0.0, s).items()},
         "n_views": len(f["views"]),
         "rejected": f["rejected"],
         "rms_px_median": round(float(np.median([f["rms_px"][n] for n in f["views"]])), 4),
@@ -189,6 +194,10 @@ def step(proj: Path, scene: dict[str, Any], cams: dict[str, Any]) -> dict[str, A
     return {
         **out,
         "scale_err_pct": np.round((np.atleast_1d(fit["mm_per_unit"]) / s - 1) * 100, 4).tolist(),
+        "sigma_rel_pct": [round(res["sigma_rel"] * 100, 4)],
+        "sigma_views_pct": np.round(np.atleast_1d(fit["sigma_rel"]) * 100, 4).tolist(),
+        "checks": {k: c["value"] for k, c in res["checks"].items()},
+        "checks_ok": res["checks_ok"],
         "n_views": len(fit["views"]),
         "rejected": fit["rejected"],
         "rms_px_median": round(float(np.median([fit["rms_px"][n] for n in fit["views"]])), 4),
@@ -219,6 +228,9 @@ def summarize_3d(rows: list[dict[str, Any]], kind: str, cams: str) -> dict[str, 
         return {"series": len(fs), "ok": 0, **plane}
     err = np.array([f["scale_err_pct"] for f in ok])  # (séries, 1 ou 2)
     a = np.abs(err)
+    z = a[:, 0] / np.maximum([f["sigma_rel_pct"][0] for f in ok], 1e-9)  # échelle retenue : |erreur| / σ
+    lim = scale.CHECKS
+    passed = [all(abs(v) <= lim[k] for k, v in f["checks"].items()) for f in ok]
     return {
         "series": len(fs),
         "ok": len(ok),
@@ -227,6 +239,16 @@ def summarize_3d(rows: list[dict[str, Any]], kind: str, cams: str) -> dict[str, 
             "max": np.round(a.max(0), 4).tolist(),
             "mean_signed": np.round(err.mean(0), 4).tolist(),
         },
+        "sigma_rel_pct_median": round(float(np.median([f["sigma_rel_pct"][0] for f in ok])), 4),
+        "err_over_sigma": {
+            "median": round(float(np.median(z)), 2),
+            "within_1": int((z <= 1).sum()),
+            "within_2": int((z <= 2).sum()),
+        },
+        "checks": {
+            k: round(float(np.max(np.abs([f["checks"][k] for f in ok]))), 4) for k in ok[0]["checks"]
+        },  # écart maximal par contrôle
+        "checks_ok": int(sum(passed)),
         "kept_failed": sum(len(f.get("kept_failed", [])) for f in ok),
         **plane,
         "rejected_ok": sum(len(f.get("rejected_ok", [])) for f in ok),
@@ -292,7 +314,8 @@ def main() -> None:
         "commit": commit.stdout.strip(),
         "method": "scale.fit_view : arête haute par rayons (silhouette côté éloigné, modèle de tranche côté caméra), "
         "masques SAM de `segment`, normale de table exacte ; puis scale.fit_circle / fit_rectangle (caméras exactes, "
-        "et étape `scale` complète : caméras `ba`, plan de table RANSAC, repère monde ; vérité par similitude des centres)",
+        "et étape `scale` complète : caméras `ba`, plan de table RANSAC, repère monde ; vérité par similitude des centres) ; "
+        "σ d'échelle par jackknife sur les vues et contrôles de cohérence (hauteur, inclinaison, côtés de la carte)",
         "params": scale.PARAMS,
         "summary": summary,
         "series": rows,

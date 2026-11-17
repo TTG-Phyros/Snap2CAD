@@ -134,6 +134,27 @@ def test_fit_rectangle_corner_order_and_scale():
     np.testing.assert_allclose(np.array(fit["mm_per_unit"]) * unit, 1, atol=5e-4)
 
 
+def test_fit_circle_sigma_and_checks():
+    unit, r_mm = 0.01, scale.REFERENCES["coin2"]["diameter"] / 2
+    a = np.linspace(0, 2 * np.pi, 360, endpoint=False)
+    circle = np.c_[r_mm * np.cos(a), r_mm * np.sin(a), np.full(360, 2.2)] * unit
+    views = views_around(n=16, unit=unit, seed=6)
+    rng = np.random.default_rng(7)
+    for v in views:  # taille de chaque ellipse faussée de 0,3 % (σ) : σ attendu ≈ 0,3 % / √16
+        (cx, cy), (w, h), t = cv2.fitEllipseDirect(project(v, circle).astype(np.float32))
+        k = 1 + rng.normal(0, 0.003)
+        v["ellipse"] = [cx, cy, k * w / 2, k * h / 2, t]
+    fit = scale.fit_circle(views, "coin2")
+    assert 0.0003 < fit["sigma_rel"] < 0.0025, fit["sigma_rel"]
+    assert abs(fit["mm_per_unit"] * unit - 1) < 4 * fit["sigma_rel"]
+    s = fit["mm_per_unit"]
+    ok = scale.checks("coin2", fit, np.array([0.0, 0, 1]), 0.0, s)
+    assert all(c["ok"] for c in ok.values()), ok
+    assert abs(ok["reference_height_mm"]["value"]) < 0.05
+    tilted = scale.checks("coin2", fit, np.array([np.sin(0.1), 0, np.cos(0.1)]), 1.0 * unit, s)  # 5,7°, 1 mm
+    assert not tilted["reference_tilt_deg"]["ok"] and not tilted["reference_height_mm"]["ok"], tilted
+
+
 def test_fit_circle_fails_on_inconsistent_poses():
     unit, r_mm = 0.01, scale.REFERENCES["coin2"]["diameter"] / 2
     a = np.linspace(0, 2 * np.pi, 360, endpoint=False)
