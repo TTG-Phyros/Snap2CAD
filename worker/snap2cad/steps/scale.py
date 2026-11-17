@@ -306,7 +306,10 @@ FIT3D: dict[str, Any] = {
     "huber_px": 1.0,  # perte de Huber sur les résidus
     "view_rms_px": 0.5,  # vue écartée si son rms dépasse max(view_rms_px, view_rms_rel × médiane des vues gardées)
     "view_rms_rel": 3.0,
-    "max_rms_px": 1.5,  # échec si le rms médian des vues gardées le dépasse (caméras exactes : 0,16 à 1,1 px)
+    # Échec si le rms médian des vues gardées dépasse cette part de la taille projetée de la référence (rayon ou
+    # demi grand côté) : un rms en px ne dit rien seul, la pièce fait 60 à 180 px de rayon, la carte 300 à 400 px.
+    # Poses `ba` justes (centres < 2 mm) : ≤ 3,7 % ; incohérentes : 14 et 29 % (M4-sigma.md).
+    "max_rms_rel": 0.05,
     "min_views": {"coin": 5, "card": 3},
 }
 
@@ -394,10 +397,28 @@ def _robust_views(
         if (new == keep).all():
             break
         keep = new
-    # Le rejet relatif ne voit rien si toutes les vues sont fausses (poses `ba` incohérentes) : garde-fou absolu.
-    if (med := float(np.median(rms[keep]))) > p["max_rms_px"]:
-        raise ValueError(f"vues incohérentes entre elles (rms médian {med:.2f} px > {p['max_rms_px']} px)")
     return x, rms, keep
+
+
+def _consistency(
+    views: list[dict[str, Any]], rms: np.ndarray, keep: np.ndarray, C: np.ndarray, half: float,
+    params: dict[str, Any] | None,
+) -> float:  # fmt: skip
+    """rms médian des vues gardées / taille projetée médiane de la référence (`half` : rayon ou demi grand côté,
+    unités du monde). Le rejet par vue ne voit rien si toutes les vues sont fausses (poses `ba` incohérentes) :
+    échec au-delà de `max_rms_rel`."""
+    p = {**FIT3D, **(params or {})}
+    size = np.median([
+        half * v["K"][0][0] / (np.asarray(v["cam_from_world"])[2] @ [*C, 1.0])
+        for v, k in zip(views, keep, strict=True) if k
+    ])  # fmt: skip
+    med = float(np.median(rms[keep]))
+    if (rel := med / float(size)) > p["max_rms_rel"]:
+        raise ValueError(
+            f"vues incohérentes entre elles (rms médian {med:.2f} px = {100 * rel:.1f} % de la référence "
+            f"> {100 * p['max_rms_rel']:g} %)"
+        )
+    return rel
 
 
 def _jackknife(
@@ -450,12 +471,14 @@ def fit_circle(
 
     x, rms, keep = _robust_views(views, "coin", residuals, np.zeros(6), params)
     C, n, r = unpack(x)
+    rms_rel = _consistency(views, rms, keep, C, r, params)
     return {
         "center": C.tolist(),
         "normal": n.tolist(),
         "radius": r,
         "mm_per_unit": REFERENCES[kind]["diameter"] / (2 * r),
         "sigma_rel": float(_jackknife(residuals, x, keep, [5], params)[0]),
+        "rms_rel": rms_rel,
         **_views_out(views, rms, keep),
     }
 
@@ -507,6 +530,7 @@ def fit_rectangle(views: list[dict[str, Any]], params: dict[str, Any] | None = N
         match(x)
         x, rms, keep = _robust_views(views, "card", residuals, x, params)
     C, R, w, h = unpack(x)
+    rms_rel = _consistency(views, rms, keep, C, max(w, h) / 2, params)
     sw, sh = _jackknife(residuals, x, keep, [6, 7], params)
     (long, ax, s_long), (short, _, s_short) = sorted(
         [(w, R[:, 0], sw), (h, R[:, 1], sh)], key=lambda t: -t[0]
@@ -519,6 +543,7 @@ def fit_rectangle(views: list[dict[str, Any]], params: dict[str, Any] | None = N
         "size": [long, short],
         "mm_per_unit": [dims["width"] / long, dims["height"] / short],
         "sigma_rel": [float(s_long), float(s_short)],
+        "rms_rel": rms_rel,
         **_views_out(views, rms, keep),
     }
 
