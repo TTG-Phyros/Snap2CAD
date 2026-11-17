@@ -39,9 +39,15 @@ PARAMS: dict[str, Any] = {
     # Smartphone : point principal à quelques px du centre ; libre, il dérive (MobileBrick : 0,37° → 0,52°).
     # À libérer pour des images recadrées ou rectifiées (DTU : décalé de 23 px, 0,66° → 0,17°).
     "refine_principal_point": False,
-    "init_error_px": 8.0,  # rejet avant ajustement, en pixels de l'image du tracker (VGGT : 8)
-    "filter_px": [4.0, 2.0],  # seuils successifs entre ajustements, en pixels de l'image du tracker
+    # Rejet avant ajustement, en pixels de l'image du tracker (VGGT : 8). 1° d'erreur de pose VGGT ≈ 13 px ici :
+    # à 8, le synthétique (VGGT ≈ 1,2°) perdait 80 % des observations et `ba` divergeait (#97).
+    "init_error_px": 64.0,
+    "filter_px": [4.0, 2.0, 1.0],  # seuils successifs entre ajustements, en pixels de l'image du tracker
     "min_observations": 50,  # en dessous : vue mal contrainte (avertissement)
+    # Contrôles de cohérence (synthétique, #97) : écart de rotation à VGGT, P90 sur les vues ≤ 2,7° sur les séries
+    # justes, ≥ 3,6° sur les séries fausses ; focale libre vs EXIF ≤ 4,7 % sur les séries justes.
+    "max_vggt_gap_deg": 3.0,
+    "max_focal_gap": 0.05,
 }
 
 
@@ -121,11 +127,24 @@ def errors(rec: pycolmap.Reconstruction, ids: dict[int, int], xy: np.ndarray, ma
     return err
 
 
-def adjust(rec: pycolmap.Reconstruction, refine_principal_point: bool = False) -> None:
+def adjust(
+    rec: pycolmap.Reconstruction, refine_principal_point: bool = False, refine_focal_length: bool = True
+) -> None:
     opts = pycolmap.BundleAdjustmentOptions()
     opts.refine_principal_point = refine_principal_point
+    opts.refine_focal_length = refine_focal_length
     opts.loss_function_type = pycolmap.LossFunctionType.CAUCHY
     pycolmap.bundle_adjustment(rec, opts)
+
+
+def rotation_gap(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Écart de rotation (degrés) par vue entre deux jeux de poses (S, 3|4, 4) monde → caméra, au changement de
+    repère près : Q = argmax Σ tr(Qᵀ·Raᵢᵀ·Rbᵢ), puis angle de (Raᵢ·Q)·Rbᵢᵀ."""
+    ra, rb = a[:, :3, :3], b[:, :3, :3]
+    u, _, vt = np.linalg.svd(np.einsum("nji,njk->ik", ra, rb))
+    q = u @ np.diag([1.0, 1.0, np.linalg.det(u @ vt)]) @ vt
+    cos = (np.einsum("nij,nij->n", ra @ q, rb) - 1) / 2
+    return np.degrees(np.arccos(np.clip(cos, -1, 1)))
 
 
 def stats(e: np.ndarray) -> dict[str, float]:
@@ -193,19 +212,24 @@ def run(
     for i, n in enumerate(names):
         e = exif[n]
         groups.setdefault((e["lens_model"], e["focal_35mm"], e["width"], e["height"]), []).append(i)
-    cams, cam_of, cam_info = [], [0] * s, []
+    # Départ avec la focale VGGT : la seule cohérente avec ses poses et ses points (la focale EXIF, juste mais
+    # jusqu'à 15 % plus courte sur le synthétique, donnait 30 à 200 px d'erreur initiale et vidait le rejet).
+    cams, cam_of, cam_info, f_exif = [], [0] * s, [], {}
     for cid, idx in enumerate(groups.values(), 1):
         e = exif[names[idx[0]]]
-        exif_f = e["K"]["source"] == "exif_35mm"
-        f = e["K"]["fx"] if exif_f else float(np.median(pred["K_full"][idx][:, [0, 1], [0, 1]]))
+        f = float(np.median(pred["K_full"][idx][:, [0, 1], [0, 1]]))
+        if e["K"]["source"] == "exif_35mm":
+            f_exif[cid] = e["K"]["fx"]
         extra = [0.0] * (1 if p["camera_model"] == "SIMPLE_RADIAL" else 2)
         cx, cy = e["width"] / 2, e["height"] / 2
         cams.append(pycolmap.Camera(model=p["camera_model"], width=e["width"], height=e["height"],
                                     params=[f, cx, cy, *extra], camera_id=cid))  # fmt: skip
         for i in idx:
             cam_of[i] = cid
-        cam_info.append({"id": cid, "images": [names[i] for i in idx], "focal_init": round(f, 2),
-                         "focal_source": "exif" if exif_f else "vggt"})  # fmt: skip
+        cam_info.append({"id": cid, "images": [names[i] for i in idx], "focal_vggt": round(f, 2),
+                         "focal_exif": round(f_exif[cid], 2) if cid in f_exif else None})  # fmt: skip
+    # Focale EXIF (juste sur le synthétique) figée après le 1er ajustement ; libre, elle restait 1 à 2,4 % trop longue.
+    use_exif = len(f_exif) == len(cams)
 
     # Rejet initial avec les poses VGGT, puis ajustements successifs avec filtrage.
     scale = np.array([max(exif[n]["width"], exif[n]["height"]) / t for n in names])[:, None]
@@ -214,7 +238,7 @@ def run(
     err = errors(rec, ids, xy, mask)
     mask &= np.nan_to_num(err, nan=np.inf) < p["init_error_px"] * scale
     rounds = [{"threshold_px": None, "observations": int(mask.sum()), "before": stats(err)}]
-    for thr in [None, *p["filter_px"]]:
+    for r, thr in enumerate([None, *p["filter_px"]]):
         if thr is not None:
             mask &= np.nan_to_num(err, nan=np.inf) < thr * scale
         extr = np.stack([rec.images[i + 1].cam_from_world.matrix() for i in range(s)])
@@ -222,22 +246,31 @@ def run(
         for j, pid in ids.items():
             xyz_now[j] = rec.points3D[pid].xyz
         cams = [rec.cameras[c] for c in sorted(rec.cameras)]
+        if r == 1 and use_exif:
+            for c in cams:
+                c.focal_length = f_exif[c.camera_id]
         rec, ids = build(names, cams, cam_of, extr, xy, mask, xyz_now, rgb)
-        adjust(rec, p["refine_principal_point"])
+        adjust(rec, p["refine_principal_point"], refine_focal_length=r == 0 or not use_exif)
         err = errors(rec, ids, xy, mask)
         rounds.append({"threshold_px": thr, "observations": int(np.isfinite(err).sum()), "after": stats(err)})
+        if r == 0:  # focale estimée sans l'EXIF : contrôle de cohérence
+            for c in cam_info:
+                c["focal_free"] = round(float(rec.cameras[c["id"]].focal_length), 2)
 
     shutil.rmtree(root / "sparse", ignore_errors=True)
     (root / "sparse").mkdir()
     rec.write(root / "sparse")
     obs = np.isfinite(err).sum(1)
+    extr = np.stack([rec.images[i + 1].cam_from_world.matrix() for i in range(s)])
+    gap = rotation_gap(extr, pred["extrinsic"].astype(np.float64))
     per_image = [
         {
             "name": n,
             "observations": int(o),
             "reproj_median_px": round(float(np.nanmedian(e)), 3) if o else None,
+            "vggt_gap_deg": round(float(g), 2),
         }
-        for n, o, e in zip(names, obs, err, strict=True)
+        for n, o, e, g in zip(names, obs, err, gap, strict=True)
     ]
     for c in cam_info:
         c["params"] = [round(float(v), 6) for v in rec.cameras[c["id"]].params]
@@ -245,6 +278,16 @@ def run(
     if weak := [r["name"] for r in per_image if r["observations"] < p["min_observations"]]:
         checks.append({"level": "warning", "code": "weak_views", "images": weak,
                        "message": "Peu de points suivis sur certaines photos : poses peu fiables."})  # fmt: skip
+    if np.percentile(gap, 90) > p["max_vggt_gap_deg"]:
+        checks.append({"level": "warning", "code": "pose_drift",
+                       "images": [r["name"] for r in per_image if r["vggt_gap_deg"] > p["max_vggt_gap_deg"]],
+                       "message": "Poses ajustées en désaccord avec l'estimation initiale : poses probablement "
+                                  "fausses (ajouter des photos entre ces vues)."})  # fmt: skip
+    if bad := [c["id"] for c in cam_info if c["focal_exif"] and
+               abs(c["focal_free"] / c["focal_exif"] - 1) > p["max_focal_gap"]]:  # fmt: skip
+        checks.append({"level": "warning", "code": "focal_mismatch", "cameras": bad,
+                       "message": "Focale estimée et focale EXIF en désaccord : poses peu fiables, ou photo "
+                                  "recadrée (zoom numérique)."})  # fmt: skip
     report = {
         "camera_model": p["camera_model"],
         "cameras": cam_info,
@@ -254,6 +297,7 @@ def run(
         "n_observations": int(obs.sum()),
         "mean_track_length": round(float(obs.sum() / max(len(ids), 1)), 2),
         "reproj_px": stats(err),
+        "vggt_gap_deg": stats(gap),
         "rounds": rounds,
         "images": per_image,
         "checks": checks,
