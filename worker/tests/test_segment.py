@@ -1,7 +1,9 @@
 import json
 import os
+from types import SimpleNamespace
 
 import numpy as np
+import pycolmap
 import pytest
 import torch
 from PIL import Image
@@ -24,6 +26,9 @@ class FakePredictor:
     def init_state(self, path, **_):
         self.n = len(os.listdir(path))
         return {}
+
+    def reset_state(self, state):
+        self.clicks = []
 
     def add_new_points_or_box(self, state, i, obj_id, points, labels, normalize_coords):
         assert not normalize_coords
@@ -94,3 +99,31 @@ def test_run_orders_by_exif_and_writes_masks(tmp_path, monkeypatch):
 def test_invalid_params_refused(tmp_path, params, message):
     with pytest.raises(ValueError, match=message):
         segment.run(make_project(tmp_path), INFO, params)
+
+
+def test_guided_3d_finds_lost_view_and_box():
+    """Caméra fixe (sténopé f = 100, 200 × 100 px), objet à z = 2 m, table derrière. Photo 0 cliquée,
+    masque juste ; photo 1 perdue (masque sur la table) ; photo 2 juste mais non cliquée."""
+    rng = np.random.default_rng(0)
+    obj = np.c_[rng.uniform(-0.4, 0.4, 60), rng.uniform(-0.2, 0.2, 60), np.full(60, 2.0)]
+    table = np.c_[rng.uniform(-1.8, 1.8, 200), rng.uniform(-0.9, 0.9, 200), np.full(200, 4.0)]
+    table = table[(np.abs(table[:, 0]) > 1.2) | (np.abs(table[:, 1]) > 0.6)]  # hors de l'objet à l'image
+    X = np.r_[obj, table]
+    uv = X[:, :2] / X[:, 2:] * 100 + [100, 50]
+    good = np.zeros((100, 200), bool)
+    good[38:63, 78:123] = True  # projection de l'objet : x ∈ [80, 120], y ∈ [40, 60]
+    wrong = np.zeros((100, 200), bool)
+    wrong[:, :40] = True
+
+    tracks = object.__new__(segment.Tracks)
+    tracks.xyz = dict(enumerate(X))
+    tracks.obs = {i: (np.arange(len(X)), uv) for i in range(3)}
+    tracks.images = {i: SimpleNamespace(cam_from_world=pycolmap.Rigid3d()) for i in range(3)}
+    cam = pycolmap.Camera(model="SIMPLE_PINHOLE", width=200, height=100, params=[100.0, 100.0, 50.0])
+    tracks.cameras = dict.fromkeys(range(3), cam)
+
+    ids, lost = segment.lost_views(tracks, {0: good, 1: wrong, 2: good}, {0}, segment.PARAMS)
+    assert set(ids) == set(range(60))  # points de l'objet seuls
+    assert list(lost) == [1] and lost[1] == 0.0
+    box = tracks.box(1, ids, (100, 200))
+    np.testing.assert_allclose(box, [80, 40, 120, 60], atol=1.5)
