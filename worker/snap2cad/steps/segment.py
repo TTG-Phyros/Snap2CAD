@@ -10,6 +10,11 @@ masques) : les points 3D de la cible sont ceux dont les observations tombent dan
 fiables (cliquées, puis celles où la propagation s'accorde avec ces points). Une photo où la plupart des
 observations de ces points tombent hors du masque est perdue : la boîte de leur projection y devient une
 invite, comme un clic de correction, et la propagation est relancée.
+
+Repli BiRefNet (objet saillant), pour l'objet seulement : BiRefNet détoure chaque photo avant SAM. S'il s'accorde
+avec le masque des photos cliquées (il détoure bien l'objet désigné), une photo où SAM et BiRefNet divergent, et
+que la géométrie ne juge pas correcte, reçoit la boîte du masque BiRefNet comme invite. Utile surtout sans points
+`ba` sur l'objet (noir mat, uni).
 """
 
 from __future__ import annotations
@@ -30,7 +35,7 @@ import torch.nn.functional as F
 from PIL import Image
 
 from snap2cad import device
-from snap2cad.models import manifest
+from snap2cad.models import birefnet, manifest
 from snap2cad.models import sam as sam_model
 from snap2cad.project import Project
 
@@ -48,6 +53,9 @@ PARAMS: dict[str, Any] = {
     "guide_trust": 0.8,  # part des projections dans le masque : photo fiable (sert à remonter la cible)
     "guide_lost": 0.5,  # en dessous : photo perdue, relancée avec la boîte reprojetée
     "guide_rounds": 3,  # relances au plus par cible (comme la correction manuelle)
+    "salient_rounds": 3,  # relances BiRefNet au plus (objet) ; 0 : BiRefNet désactivé
+    "salient_agree": 0.8,  # IoU SAM / BiRefNet minimale sur les photos cliquées pour se fier à BiRefNet
+    "salient_lost": 0.5,  # IoU SAM / BiRefNet en dessous : photo relancée avec la boîte BiRefNet
 }
 Box = tuple[float, float, float, float]  # x0, y0, x1, y1 en pixels de la photo
 
@@ -110,6 +118,15 @@ def inside(mask: np.ndarray, xy: np.ndarray) -> np.ndarray:
     return mask[y, x]
 
 
+def iou(a: np.ndarray, b: np.ndarray) -> float:
+    return float((a & b).sum() / max((a | b).sum(), 1))
+
+
+def mask_box(m: np.ndarray) -> Box:
+    ys, xs = np.nonzero(m)
+    return float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)
+
+
 def lost_views(
     tracks: Tracks,
     masks: dict[int, np.ndarray],
@@ -117,7 +134,7 @@ def lost_views(
     p: dict[str, Any],
     hidden: dict[int, np.ndarray] | None = None,
 ) -> tuple[np.ndarray, dict[int, float]]:
-    """Points de la cible et photos perdues (n° → part des projections dans le masque). Les points cachés
+    """Points de la cible et photos jugées hors photos cliquées (n° → part des projections dans le masque). Les points cachés
     se projettent aussi dans la silhouette : toutes les projections comptent, pas seulement les observations.
     Photo jugée si la cible y est entière (≥ 90 % des projections dans l'image) et, avec `hidden` (masques de
     l'objet, pour la référence posée sur la table), pas cachée à plus de moitié. Les photos fiables s'ajoutent
@@ -140,7 +157,7 @@ def lost_views(
         if new == trusted:
             break
         trusted = new
-    return ids, {i: f for i, f in frac.items() if f < p["guide_lost"] and i not in clicked}
+    return ids, {i: f for i, f in frac.items() if i not in clicked}
 
 
 def run(
@@ -165,6 +182,8 @@ def run(
     p["model"] = p["model"] or sam_model.MODELS[info.profile][0]
     model_sha = manifest()[p["model"]]["files"][0]["sha256"]
     versions = {"snap2cad": version("snap2cad"), "sam2": version("sam-2"), "model": model_sha}
+    if p["salient_rounds"]:
+        versions["birefnet"] = manifest()[birefnet.NAME]["files"][-1]["sha256"]
     guided = (root / "sparse").is_dir()
     key = project.inputs_hash(["images", "exif.json", *(["sparse"] if guided else [])], p, versions)
     if not project.needs_run(STEP, key):
@@ -175,8 +194,19 @@ def run(
     masks: dict[str, dict[int, np.ndarray]] = {t: {} for t in targets}  # n° de photo → masque
     tracks = Tracks(pycolmap.Reconstruction(root / "sparse"), frames) if guided else None
     prompts: dict[str, dict[str, list[float]]] = {t: {} for t in targets}  # photo → boîte reprojetée
-    predictor = sam_model.load(p["model"], info)
     device.reset_peak_memory(info)
+    salient: dict[int, np.ndarray] = {}  # n° de photo → masque BiRefNet
+    if p["salient_rounds"]:  # avant SAM : les deux modèles ne sont jamais en VRAM ensemble
+        net = birefnet.load(birefnet.NAME, info)
+        for i, e in enumerate(frames):
+            rgb = np.asarray(Image.open(root / e["file"]).convert("RGB"))
+            salient[i] = birefnet.predict(net, rgb, info) > 0.5
+        net = None
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    salient_prompts: dict[str, list[float]] = {}
+    salient_agree = None
+    predictor = sam_model.load(p["model"], info)
     with tempfile.TemporaryDirectory() as tmp, torch.inference_mode(), device.autocast(info):
         for i, e in enumerate(frames):  # SAM lit un dossier « <n° de trame>.jpg »
             shutil.copyfile(root / e["file"], Path(tmp) / f"{i:05d}.jpg")
@@ -230,7 +260,8 @@ def run(
             for target in targets:
                 # Graines : les photos cliquées. Une photo relancée ne compte que si elle s'accorde ensuite.
                 hidden = masks["object"] if target == "reference" and "object" in masks else None
-                ids, lost = lost_views(tracks, masks[target], clicked[target], p, hidden)
+                ids, judged = lost_views(tracks, masks[target], clicked[target], p, hidden)
+                lost = {i: f for i, f in judged.items() if f < p["guide_lost"]}
                 for i in sorted(lost, key=lost.__getitem__):  # la plus perdue d'abord, une par tour
                     hw = (frames[i]["height"], frames[i]["width"])
                     if i in boxes[target] or (box := tracks.box(i, ids, hw)) is None:
@@ -241,6 +272,29 @@ def run(
                     break
             if not added:
                 break
+            prompt_and_propagate()
+
+        if salient and "object" in targets:
+            ref = masks.get("reference", {})  # composante de l'objet : hors pièce ou carte vue par SAM
+            salient = {i: birefnet.largest_component(m, ref.get(i)) for i, m in salient.items()}
+            salient_agree = min(iou(masks["object"][i], salient[i]) for i in clicked["object"])
+        trust_salient = salient_agree is not None and salient_agree >= p["salient_agree"]
+        for _ in range(p["salient_rounds"] if trust_salient else 0):
+            ok = set()  # photos que la géométrie juge correctes : BiRefNet ne les contredit pas
+            if tracks:
+                _, judged = lost_views(tracks, masks["object"], clicked["object"], p, None)
+                ok = {i for i, f in judged.items() if f >= p["guide_trust"]}
+            gap = {
+                i: x
+                for i in range(len(frames))
+                if i not in clicked["object"] | ok and Path(frames[i]["file"]).name not in salient_prompts
+                and salient[i].any() and (x := iou(masks["object"][i], salient[i])) < p["salient_lost"]
+            }  # fmt: skip
+            if not gap:
+                break
+            i = min(gap, key=gap.__getitem__)
+            boxes["object"][i] = mask_box(salient[i])  # remplace une boîte reprojetée éventuelle
+            salient_prompts[Path(frames[i]["file"]).name] = [round(v, 1) for v in boxes["object"][i]]
             prompt_and_propagate()
     peak = device.peak_memory_mb(info)
     predictor = state = None  # libère la VRAM ; pas de del : la fonction imbriquée les référence
@@ -296,6 +350,13 @@ def run(
             "order": [Path(e["file"]).name for e in frames],
             "area_ratio": area,
             "guided_3d": prompts if guided else None,  # photos relancées avec une boîte reprojetée
+            # IoU SAM / BiRefNet sur les photos cliquées, et photos relancées avec la boîte BiRefNet
+            "salient": {
+                "agree": None if salient_agree is None else round(salient_agree, 4),
+                "prompts": salient_prompts,
+            }
+            if p["salient_rounds"]
+            else None,
             "checks": checks,
         },
     )

@@ -126,6 +126,30 @@
           "sha256": "9124de6362ba82084d239d7596d881b8169f8e32976f0cc6302c7d98db4f5e5f"
         }
       ]
+    },
+    "birefnet": {
+      "group": "reference",
+      "license": "BiRefNet : MIT",
+      "files": [
+        {
+          "path": "birefnet/birefnet.py",
+          "url": "https://huggingface.co/ZhengPeng7/BiRefNet/resolve/e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4/birefnet.py",
+          "size": 91896,
+          "sha256": "208771ae626f653d64128fbf2d6ac9f8e645c5cc5e286258a73ec3322bbfe5ef"
+        },
+        {
+          "path": "birefnet/BiRefNet_config.py",
+          "url": "https://huggingface.co/ZhengPeng7/BiRefNet/resolve/e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4/BiRefNet_config.py",
+          "size": 298,
+          "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+        },
+        {
+          "path": "birefnet/model.safetensors",
+          "url": "https://huggingface.co/ZhengPeng7/BiRefNet/resolve/e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4/model.safetensors",
+          "size": 444473596,
+          "sha256": "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154"
+        }
+      ]
     }
   }
 }
