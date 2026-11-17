@@ -30,9 +30,14 @@ class FakePredictor:
     def reset_state(self, state):
         self.clicks = []
 
-    def add_new_points_or_box(self, state, i, obj_id, points, labels, normalize_coords):
+    def add_new_points_or_box(
+        self, state, i, obj_id, points=None, labels=None, box=None, normalize_coords=True
+    ):
         assert not normalize_coords
-        self.clicks.append((i, obj_id, points.tolist(), labels.tolist()))
+        if box is not None:
+            self.clicks.append((i, obj_id, "box", box.tolist()))
+        else:
+            self.clicks.append((i, obj_id, points.tolist(), labels.tolist()))
 
     def propagate_in_video(self, state, start_frame_idx, reverse):
         for i in range(start_frame_idx, -1, -1) if reverse else range(start_frame_idx, self.n):
@@ -66,6 +71,17 @@ def test_run_orders_by_exif_and_writes_masks(tmp_path, monkeypatch):
     fake = FakePredictor()
     loads = []
     monkeypatch.setattr(segment.sam_model, "load", lambda name, info: loads.append(name) or fake)
+    # BiRefNet : objet en haut (comme SAM) sur les deux premières photos, en bas sur la troisième (c.jpg).
+    calls = []
+
+    def salient(net, rgb, info):
+        calls.append(1)
+        p = np.zeros(rgb.shape[:2])
+        (p[:30] if len(calls) % 3 else p[30:])[:] = 1.0
+        return p
+
+    monkeypatch.setattr(segment.birefnet, "load", lambda name, info: None)
+    monkeypatch.setattr(segment.birefnet, "predict", salient)
     clicks = {
         "object": [click("b.jpg", 40, 30), click("b.jpg", 20, 50, False)],
         "reference": [click("a.jpg", 8, 6)],
@@ -74,9 +90,16 @@ def test_run_orders_by_exif_and_writes_masks(tmp_path, monkeypatch):
     rec = segment.run(make_project(tmp_path), INFO, {"clicks": clicks})
     assert loads == ["sam2.1-hiera-base-plus"]  # profil 6 Go
     assert rec["result"]["order"] == ["b.jpg", "a.jpg", "c.jpg"]
-    assert [(i, obj, lab) for i, obj, _, lab in fake.clicks] == [(0, 1, [1, 0]), (1, 2, [1])]
+    assert [(i, obj, lab) for i, obj, _, lab in fake.clicks] == [
+        (0, 1, [1, 0]),
+        (2, 1, [0, 0.5, 1, 1]),
+        (1, 2, [1]),
+    ]
     np.testing.assert_allclose(fake.clicks[0][2], [[0.5, 0.5], [0.25, 50 / 60]], rtol=1e-6)  # normalisés
-    np.testing.assert_allclose(fake.clicks[1][2], [[0.1, 0.1]], rtol=1e-6)
+    np.testing.assert_allclose(fake.clicks[2][2], [[0.1, 0.1]], rtol=1e-6)
+    # BiRefNet d'accord sur la photo cliquée, pas sur c.jpg : sa boîte y devient une invite (normalisée).
+    assert rec["result"]["salient"] == {"agree": 1.0, "prompts": {"c.jpg": [0.0, 30.0, 80.0, 60.0]}}
+    assert fake.clicks[1][2] == "box"  # boîte normalisée par la taille de la photo
     m = np.asarray(Image.open(tmp_path / "masks/object/c.png"))
     assert m.shape == (60, 80) and m[:30].min() == 255 and m[30:].max() == 0  # remis à la taille de la photo
     assert not np.asarray(Image.open(tmp_path / "masks/reference/a.png")).any()
@@ -122,12 +145,12 @@ def test_guided_3d_finds_lost_view_and_box():
     cam = pycolmap.Camera(model="SIMPLE_PINHOLE", width=200, height=100, params=[100.0, 100.0, 50.0])
     tracks.cameras = dict.fromkeys(range(3), cam)
 
-    ids, lost = segment.lost_views(tracks, {0: good, 1: wrong, 2: good}, {0}, segment.PARAMS)
+    ids, judged = segment.lost_views(tracks, {0: good, 1: wrong, 2: good}, {0}, segment.PARAMS)
     assert set(ids) == set(range(60))  # points de l'objet seuls
-    assert list(lost) == [1] and lost[1] == 0.0
+    assert judged == {1: 0.0, 2: 1.0}  # photo 1 perdue
     box = tracks.box(1, ids, (100, 200))
     np.testing.assert_allclose(box, [80, 40, 120, 60], atol=1.5)
     # Référence cachée par l'objet (masque `hidden` sur ses projections) : photo non jugée.
     hidden = {0: np.zeros_like(good), 1: good, 2: np.zeros_like(good)}
-    _, lost = segment.lost_views(tracks, {0: good, 1: wrong, 2: good}, {0}, segment.PARAMS, hidden)
-    assert lost == {}
+    _, judged = segment.lost_views(tracks, {0: good, 1: wrong, 2: good}, {0}, segment.PARAMS, hidden)
+    assert judged == {2: 1.0}
