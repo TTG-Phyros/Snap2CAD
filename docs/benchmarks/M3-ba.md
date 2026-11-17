@@ -1,6 +1,7 @@
 # M3 — Ajustement de faisceaux (étape `ba`)
 
-Mesures brutes : [`poses.json`](poses.json) (deux dernières entrées), produites par `python -m tools.eval.poses --ba`.
+Mesures brutes : [`poses.json`](poses.json) (entrées du commit `9c83678`), produites par `python -m tools.eval.poses --ba`.
+Seuils de rejet et départ en focale revus pour le synthétique : voir [M3-ba-synth.md](M3-ba-synth.md).
 Conditions identiques à M1 : 20 vues réparties sur la série, RTX 3060 Laptop (6 Go), Windows 11.
 Méthode : suivis VGGSfM de points ALIKED + SuperPoint dans des images 1024 × 1024 cadrées comme VGGT, ramenés
 en pleine résolution ; départ poses et profondeurs VGGT ; caméra `SIMPLE_RADIAL` partagée ; pycolmap 3.11

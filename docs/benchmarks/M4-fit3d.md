@@ -54,6 +54,8 @@ Les erreurs restantes viennent du contour par vue :
 
 ## Constat bloquant : `ba` sur le synthétique
 
+> Cause trouvée et corrigée en grande partie (#97) : voir [M3-ba-synth.md](M3-ba-synth.md). Chiffres ci-dessous : état avant correction.
+
 Les poses de `ba` sur ces 30 séries sont bien moins bonnes que sur DTU et MobileBrick (M3) :
 
 | Erreur médiane des centres de caméra | Séries |
