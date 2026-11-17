@@ -127,3 +127,7 @@ def test_guided_3d_finds_lost_view_and_box():
     assert list(lost) == [1] and lost[1] == 0.0
     box = tracks.box(1, ids, (100, 200))
     np.testing.assert_allclose(box, [80, 40, 120, 60], atol=1.5)
+    # Référence cachée par l'objet (masque `hidden` sur ses projections) : photo non jugée.
+    hidden = {0: np.zeros_like(good), 1: good, 2: np.zeros_like(good)}
+    _, lost = segment.lost_views(tracks, {0: good, 1: wrong, 2: good}, {0}, segment.PARAMS, hidden)
+    assert lost == {}

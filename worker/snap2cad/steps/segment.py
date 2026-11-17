@@ -44,8 +44,8 @@ PARAMS: dict[str, Any] = {
     "clicks": {},
     "min_area_ratio": 1e-4,  # masque plus petit que cette part de l'image : cible absente de la photo
     "min_reference_views": 5,  # plan §1 : référence visible sur au moins 5 photos
-    "guide_min_obs": 15,  # observations de la cible dans une photo, en dessous : photo non jugée
-    "guide_trust": 0.8,  # part des observations dans le masque : photo fiable (sert à remonter la cible)
+    "guide_min_points": 15,  # points de la cible projetés dans la photo, en dessous : photo non jugée
+    "guide_trust": 0.8,  # part des projections dans le masque : photo fiable (sert à remonter la cible)
     "guide_lost": 0.5,  # en dessous : photo perdue, relancée avec la boîte reprojetée
     "guide_rounds": 3,  # relances au plus par cible (comme la correction manuelle)
 }
@@ -75,50 +75,67 @@ class Tracks:
             self.obs[i] = (np.array([a for a, _ in o], np.int64), np.array([b for _, b in o]).reshape(-1, 2))
             self.images[i], self.cameras[i] = im, rec.cameras[im.camera_id]
 
-    def inside(self, i: int, mask: np.ndarray, ids: np.ndarray | None = None) -> np.ndarray:
-        """Pour chaque observation de la photo i (des points `ids` seulement, si donnés) : dans `mask` ?"""
-        pid, xy = self.obs.get(i, (np.zeros(0, np.int64), np.zeros((0, 2))))
-        if ids is not None:
-            xy = xy[np.isin(pid, ids)]
-        x = np.clip(xy[:, 0].astype(int), 0, mask.shape[1] - 1)
-        y = np.clip(xy[:, 1].astype(int), 0, mask.shape[0] - 1)
-        return mask[y, x]
-
     def lift(self, masks: dict[int, np.ndarray], trusted: set[int]) -> np.ndarray:
         """Points de la cible : observés dans au moins une photo fiable, dans le masque pour plus de la moitié."""
         votes: dict[int, list[bool]] = defaultdict(list)
         for i in trusted & self.obs.keys():
-            for pid, ok in zip(self.obs[i][0], self.inside(i, masks[i]), strict=True):
+            for pid, ok in zip(self.obs[i][0], inside(masks[i], self.obs[i][1]), strict=True):
                 votes[int(pid)].append(bool(ok))
         return np.array(sorted(pid for pid, v in votes.items() if np.mean(v) > 0.5), np.int64)
 
-    def box(self, i: int, ids: np.ndarray, hw: tuple[int, int]) -> Box | None:
-        """Boîte (1ᵉʳ – 99ᵉ centiles) de la projection des points `ids` dans la photo i, distorsion comprise."""
+    def project(self, i: int, ids: np.ndarray, hw: tuple[int, int] | None = None) -> np.ndarray:
+        """Projection (distorsion comprise) des points `ids` devant la photo i ; avec `hw`, ceux dans l'image."""
         im, cam = self.images[i], self.cameras[i]
         X = np.array([self.xyz[int(p)] for p in ids]).reshape(-1, 3)
         Xc = X @ im.cam_from_world.rotation.matrix().T + im.cam_from_world.translation
         Xc = Xc[Xc[:, 2] > 0]
-        if len(Xc) < 3:
-            return None
+        if not len(Xc):
+            return np.zeros((0, 2))
         uv = np.asarray(cam.img_from_cam(Xc[:, :2] / Xc[:, 2:]), np.float64).reshape(-1, 2)
+        return uv[(uv >= 0).all(1) & (uv[:, 0] < hw[1]) & (uv[:, 1] < hw[0])] if hw else uv
+
+    def box(self, i: int, ids: np.ndarray, hw: tuple[int, int]) -> Box | None:
+        """Boîte (1ᵉʳ – 99ᵉ centiles) de la projection des points `ids` dans la photo i."""
+        uv = self.project(i, ids, hw)
+        if len(uv) < 3:
+            return None
         lo, hi = np.percentile(uv, 1, axis=0), np.percentile(uv, 99, axis=0)
-        lo, hi = np.maximum(lo, 0), np.minimum(hi, [hw[1], hw[0]])
         return None if (hi <= lo).any() else (float(lo[0]), float(lo[1]), float(hi[0]), float(hi[1]))
 
 
+def inside(mask: np.ndarray, xy: np.ndarray) -> np.ndarray:
+    """Pixels `xy` (N, 2), convention COLMAP, dans `mask` ?"""
+    x = np.clip(xy[:, 0].astype(int), 0, mask.shape[1] - 1)
+    y = np.clip(xy[:, 1].astype(int), 0, mask.shape[0] - 1)
+    return mask[y, x]
+
+
 def lost_views(
-    tracks: Tracks, masks: dict[int, np.ndarray], clicked: set[int], p: dict[str, Any]
+    tracks: Tracks,
+    masks: dict[int, np.ndarray],
+    clicked: set[int],
+    p: dict[str, Any],
+    hidden: dict[int, np.ndarray] | None = None,
 ) -> tuple[np.ndarray, dict[int, float]]:
-    """Points de la cible et photos perdues (n° → part des observations dans le masque). Les photos fiables
-    s'ajoutent aux photos cliquées tant que l'ensemble change."""
+    """Points de la cible et photos perdues (n° → part des projections dans le masque). Les points cachés
+    se projettent aussi dans la silhouette : toutes les projections comptent, pas seulement les observations.
+    Photo jugée si la cible y est entière (≥ 90 % des projections dans l'image) et, avec `hidden` (masques de
+    l'objet, pour la référence posée sur la table), pas cachée à plus de moitié. Les photos fiables s'ajoutent
+    aux photos cliquées tant que l'ensemble change."""
     trusted = set(clicked)
     for _ in range(10):
         ids = tracks.lift(masks, trusted)
-        frac = {
-            i: float(ok.mean())
-            for i in tracks.obs
-            if len(ok := tracks.inside(i, masks[i], ids)) >= p["guide_min_obs"]
-        }
+        frac = {}
+        for i in tracks.obs:
+            front = tracks.project(i, ids)
+            uv = tracks.project(i, ids, masks[i].shape)
+            if len(uv) < max(p["guide_min_points"], 0.9 * len(front)):
+                continue
+            if hidden is not None:
+                uv = uv[~inside(hidden[i], uv)]
+                if len(uv) < max(p["guide_min_points"], 0.5 * len(front)):
+                    continue
+            frac[i] = float(inside(masks[i], uv).mean())
         new = clicked | {i for i, f in frac.items() if f >= p["guide_trust"]}
         if new == trusted:
             break
@@ -189,6 +206,8 @@ def run(
                         # Photos de tailles différentes : SAM normaliserait par une seule, on le fait par photo.
                         normalize_coords=False,
                     )
+                # Boîte seule : des points positifs en plus aident l'enceinte noire mais perdent la pièce du mug,
+                # des points seuls dégradent (8 séries, M2-segment.md).
                 for i, b in boxes[target].items():
                     w, h = frames[i]["width"], frames[i]["height"]
                     predictor.add_new_points_or_box(
@@ -210,7 +229,8 @@ def run(
             added = False
             for target in targets:
                 # Graines : les photos cliquées. Une photo relancée ne compte que si elle s'accorde ensuite.
-                ids, lost = lost_views(tracks, masks[target], clicked[target], p)
+                hidden = masks["object"] if target == "reference" and "object" in masks else None
+                ids, lost = lost_views(tracks, masks[target], clicked[target], p, hidden)
                 for i in sorted(lost, key=lost.__getitem__):  # la plus perdue d'abord, une par tour
                     hw = (frames[i]["height"], frames[i]["width"])
                     if i in boxes[target] or (box := tracks.box(i, ids, hw)) is None:
