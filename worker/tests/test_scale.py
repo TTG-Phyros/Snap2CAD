@@ -160,11 +160,19 @@ def test_fit_circle_fails_on_inconsistent_poses():
     a = np.linspace(0, 2 * np.pi, 360, endpoint=False)
     circle = np.c_[r_mm * np.cos(a), r_mm * np.sin(a), np.full(360, 2.2)] * unit
     views = views_around(unit=unit)
-    for i, v in enumerate(views):
-        (cx, cy), (w, h), t = cv2.fitEllipseDirect(project(v, circle).astype(np.float32))
-        v["ellipse"] = [cx + 8 * (-1) ** i, cy, w / 2, h / 2, t]  # toutes décalées : aucune vue de référence
+    exact = [cv2.fitEllipseDirect(project(v, circle).astype(np.float32)) for v in views]
+
+    def shifted(k: float) -> list[dict]:  # toutes décalées de k × rayon projeté : aucune vue de référence
+        return [
+            {**v, "ellipse": [cx + k * max(w, h) / 2 * (-1) ** i, cy, w / 2, h / 2, t]}
+            for i, (v, ((cx, cy), (w, h), t)) in enumerate(zip(views, exact, strict=True))
+        ]
+
     with pytest.raises(ValueError, match="incohérentes"):
-        scale.fit_circle(views, "coin2")
+        scale.fit_circle(shifted(0.15), "coin2")
+    # Seuil relatif à la taille projetée de la pièce, pas en px : un petit décalage passe et se mesure.
+    fit = scale.fit_circle(shifted(0.01), "coin2")
+    assert 0.003 < fit["rms_rel"] < 0.02, fit["rms_rel"]
 
 
 def test_table_plane_ignores_box_top_and_wall():

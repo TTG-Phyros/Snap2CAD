@@ -156,6 +156,7 @@ def fit3d(fits: list[dict[str, Any]], ref: dict[str, Any], mm_per_unit: float) -
         "n_views": len(f["views"]),
         "rejected": f["rejected"],
         "rms_px_median": round(float(np.median([f["rms_px"][n] for n in f["views"]])), 4),
+        "rms_rel_pct": round(f["rms_rel"] * 100, 3),
     }
 
 
@@ -169,7 +170,14 @@ def step(proj: Path, scene: dict[str, Any], cams: dict[str, Any]) -> dict[str, A
     src = np.array([im.projection_center() for im in rec.images.values()])
     s, R, t = metrics.umeyama(src, metrics.camera_centers(np.array([cams[n][0] for n in names])))
     xyz, obj = scale.sparse_points(rec, proj / "masks/object")
-    out: dict[str, Any] = {"n_points": len(xyz), "n_object": int(obj.sum())}
+    ba = json.loads((proj / "ba_report.json").read_text("utf-8")) if (proj / "ba_report.json").is_file() else {}
+    out: dict[str, Any] = {
+        "n_points": len(xyz),
+        "n_object": int(obj.sum()),
+        "pose_center_mm_median": round(float(np.median(np.linalg.norm(
+            s * src @ R.T + t - metrics.camera_centers(np.array([cams[n][0] for n in names])), axis=1))), 3),
+        "ba_checks": [c["code"] for c in ba.get("checks", [])],  # avertissements de `ba` (pose_drift…)
+    }  # fmt: skip
     try:
         n, _, inl = scale.table_plane(xyz[~obj], src)
     except ValueError as e:
@@ -201,6 +209,7 @@ def step(proj: Path, scene: dict[str, Any], cams: dict[str, Any]) -> dict[str, A
         "n_views": len(fit["views"]),
         "rejected": fit["rejected"],
         "rms_px_median": round(float(np.median([fit["rms_px"][n] for n in fit["views"]])), 4),
+        "rms_rel_pct": round(fit["rms_rel"] * 100, 3),
         "origin_err_mm": np.round(origin - [*ref["center_mm"][:2], 0.0], 3).tolist(),
         "reference_height_mm": res["reference_height_mm"],
         # grand axe presque vertical (objet debout) : axe X non défini par la vérité
