@@ -144,3 +144,42 @@ def test_fit_circle_fails_on_inconsistent_poses():
         v["ellipse"] = [cx + 8 * (-1) ** i, cy, w / 2, h / 2, t]  # toutes décalées : aucune vue de référence
     with pytest.raises(ValueError, match="incohérentes"):
         scale.fit_circle(views, "coin2")
+
+
+def test_table_plane_ignores_box_top_and_wall():
+    unit = 0.01
+    rng = np.random.default_rng(5)
+    table = np.c_[rng.uniform(-150, 150, (800, 2)), rng.normal(0, 0.2, 800)]
+    top = np.c_[rng.uniform(-30, 30, (300, 2)), np.full(300, 60.0)]  # dessus d'une boîte (objet mal détouré)
+    wall = np.c_[np.zeros(1500), rng.uniform(-150, 150, 1500), rng.uniform(0, 200, 1500)]  # coupe les caméras
+    noise = rng.uniform([-150, -150, 0], [150, 150, 150], (300, 3))
+    xyz = np.r_[table, top, wall, noise] * unit
+    centers = np.array(
+        [-v["cam_from_world"][:, :3].T @ v["cam_from_world"][:, 3] for v in views_around(unit=unit)]
+    )
+    n, d, inl = scale.table_plane(xyz, centers)
+    assert n[2] > 0.9999, n  # vers les caméras
+    assert abs(d) < 0.3 * unit, d
+    assert inl[:800].mean() > 0.95 and inl[800:1100].sum() == 0
+
+
+def test_view_up_is_projected_normal():
+    unit = 0.01
+    v = views_around(unit=unit)[0]
+    X, n = np.array([5.0, -3, 0]) * unit, np.array([0.0, 0, 1])
+    q = project(v, np.stack([X, X + 1e-6 * n]))
+    np.testing.assert_allclose(scale.view_up(v, X, n), (q[1] - q[0]) / np.linalg.norm(q[1] - q[0]), atol=1e-6)
+    px = project(v, X[None])[0]
+    np.testing.assert_allclose(scale.plane_point(v, px, n, 0.0), X, atol=1e-9)
+
+
+def test_world_frame():
+    unit, t = 0.01, np.radians(30)
+    axis = np.array([np.cos(t), np.sin(t), 0])
+    obj = (np.linspace(-100, 100, 50)[:, None] * axis + [0, 0, 20] + [120, 60, 0]) * unit
+    center = np.array([5.0, -3, 2.2]) * unit
+    M = scale.world_frame(np.array([0.0, 0, 1]), -1.0 * unit, center, obj, 1 / unit)  # table à z = 1 mm
+    world = np.c_[obj, np.ones(len(obj))] @ M.T
+    np.testing.assert_allclose(M @ [*center, 1], [0, 0, 1.2, 1], atol=1e-9)  # face haute à 1,2 mm de la table
+    np.testing.assert_allclose(np.ptp(world[:, :3], 0), [200 * 1, 0, 0], atol=1e-6)  # objet le long de X
+    assert world[:, 0].mean() > 0 and np.allclose(world[:, 2], 19)

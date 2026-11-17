@@ -1,6 +1,6 @@
 # M4 — Cercle ou rectangle 3D sur plusieurs vues (`scale.fit_circle`, `scale.fit_rectangle`)
 
-Mesures brutes : [`scale.json`](scale.json) (dernière entrée, clé `fit3d`), produites par `python -m tools.eval.scale`
+Mesures brutes : [`scale.json`](scale.json) (entrée du commit `8e7ab1f`, clé `fit3d`), produites par `python -m tools.eval.scale`
 (30 séries synthétiques). Entrées : les ajustements par vue de `scale.fit_view` ([M4-contour.md](M4-contour.md)),
 avec la normale de table exacte. Deux jeux de caméras :
 - **exactes** : poses et intrinsèques du rendu, en mm. On isole l'ajustement 3D et le contour ;

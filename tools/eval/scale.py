@@ -7,6 +7,8 @@ de celle des poses et du plan.
 - Pièce : demi-axes de l'ellipse ajustée vs ceux de la face haute projetée (cercle à z = épaisseur).
 - Carte : longueur des côtés ajustés vs ceux de la face haute (coins vifs, 85,60 × 53,98 mm).
 L'erreur relative de taille d'une vue donne l'ordre de grandeur de sa contribution à l'erreur d'échelle.
+Puis cercle ou rectangle 3D : caméras exactes, et étape `scale` complète (caméras `ba`, plan de table, repère
+monde) alignée sur la vérité par similitude des centres des caméras.
 Aussi : distance des points retenus à l'arête haute et à la silhouette exactes (enveloppe des faces haute et
 basse). Par défaut : toutes les séries ; résultats ajoutés dans docs/benchmarks/scale.json.
 """
@@ -25,6 +27,7 @@ import numpy as np
 import pycolmap
 from PIL import Image
 
+from snap2cad.project import Project
 from snap2cad.steps import scale
 from tools.eval import metrics
 
@@ -76,22 +79,27 @@ def evaluate(series: str, params: dict[str, Any] | None = None) -> dict[str, Any
         }
     W, H = scene["camera"]["width"], scene["camera"]["height"]
     c0 = np.array(ref["center_mm"])
-    views, fits, ups = [], [], {}
+    views, fits = [], []
     for mpath in sorted((proj / "masks/reference").glob("*.png")):
         mask = np.asarray(Image.open(mpath)) > 0
         if mask.sum() < MIN_MASK_PX:  # référence absente ou perdue par `segment`
             continue
         w2c, K, k1 = cams[mpath.stem]
         cam = pycolmap.Camera(
-            model="SIMPLE_RADIAL", width=W, height=H, params=[K[0, 0], K[0, 2], K[1, 2], k1]
+            model="SIMPLE_RADIAL",
+            width=W,
+            height=H,
+            params=[K[0, 0], K[0, 2], K[1, 2], k1],
         )
         rgb = np.asarray(Image.open(proj / "images" / f"{mpath.stem}.jpg").convert("RGB"))
         top = pinhole(reference_outline(ref, ref["dims_mm"]["thickness"]), w2c, K)
         hull = cv2.convexHull(np.r_[top, pinhole(reference_outline(ref, 0.0), w2c, K)].astype(np.float32))
         # « Haut » : normale de la table projetée au centre de la référence (en production : plan et poses).
         a, b = pinhole(np.stack([c0, c0 + [0, 0, 10.0]]), w2c, K)
-        ups[mpath.stem] = b - a
-        v: dict[str, Any] = {"view": mpath.stem, "size_px": round(float(np.ptp(hull[:, 0], 0).max()), 1)}
+        v: dict[str, Any] = {
+            "view": mpath.stem,
+            "size_px": round(float(np.ptp(hull[:, 0], 0).max()), 1),
+        }
         try:
             fit = scale.fit_view(rgb, mask, cam, ref["type"], up=(b - a), params=params)
         except ValueError as e:
@@ -120,9 +128,14 @@ def evaluate(series: str, params: dict[str, Any] | None = None) -> dict[str, Any
         failed = {v["view"] for v in views if v.get("failed")}
         exact["kept_failed"] = sorted(failed - set(exact["rejected"]))
         exact["rejected_ok"] = sorted(set(exact["rejected"]) - failed)
-    out = {"series": series, "reference": ref["type"], "views": views, "fit3d": {"exact": exact}}
+    out = {
+        "series": series,
+        "reference": ref["type"],
+        "views": views,
+        "fit3d": {"exact": exact},
+    }
     if (proj / "sparse").is_dir():
-        out["fit3d"]["ba"] = fit3d_ba(proj, ref, cams, ups, params)
+        out["fit3d"]["step"] = step(proj, scene, cams)
     return out
 
 
@@ -141,34 +154,53 @@ def fit3d(fits: list[dict[str, Any]], ref: dict[str, Any], mm_per_unit: float) -
     }
 
 
-def fit3d_ba(
-    proj: Path,
-    ref: dict[str, Any],
-    cams: dict[str, Any],
-    ups: dict[str, np.ndarray],
-    params: dict[str, Any] | None,
-) -> dict[str, Any]:
-    """Même chose avec les caméras de `ba` (distorsion comprise) ; vérité : similitude des centres des caméras
-    `ba` → vérité terrain (mm par unité `ba`)."""
+def step(proj: Path, scene: dict[str, Any], cams: dict[str, Any]) -> dict[str, Any]:
+    """Étape `scale` complète (caméras `ba`, plan de table, « haut » par vue) ; vérité : similitude des centres
+    des caméras `ba` → vérité terrain (table : z = 0). Plan de table mesuré seul (même si l'étape échoue), puis
+    erreurs d'échelle, d'origine (centre de la référence sur la table) et d'axe X (grand axe de l'objet)."""
+    ref = scene["reference"]
     rec = pycolmap.Reconstruction(proj / "sparse")
-    fits, src, dst = [], [], []
-    for im in rec.images.values():
-        stem = Path(im.name).stem
-        w2c = im.cam_from_world.matrix()
-        src.append(-w2c[:, :3].T @ w2c[:, 3])
-        dst.append(metrics.camera_centers(cams[stem][0][None])[0])
-        if stem not in ups:
-            continue
-        cam = rec.cameras[im.camera_id]
-        mask = np.asarray(Image.open(proj / "masks/reference" / f"{stem}.png")) > 0
-        rgb = np.asarray(Image.open(proj / "images" / im.name).convert("RGB"))
-        try:
-            fit = scale.fit_view(rgb, mask, cam, ref["type"], up=ups[stem], params=params)
-        except ValueError:
-            continue
-        fits.append({"name": stem, "K": cam.calibration_matrix(), "cam_from_world": w2c, **fit})
-    s, _, _ = metrics.umeyama(np.array(src), np.array(dst))
-    return fit3d(fits, ref, s)
+    names = [Path(im.name).stem for im in rec.images.values()]
+    src = np.array([im.projection_center() for im in rec.images.values()])
+    s, R, t = metrics.umeyama(src, metrics.camera_centers(np.array([cams[n][0] for n in names])))
+    xyz, obj = scale.sparse_points(rec, proj / "masks/object")
+    out: dict[str, Any] = {"n_points": len(xyz), "n_object": int(obj.sum())}
+    try:
+        n, _, inl = scale.table_plane(xyz[~obj], src)
+    except ValueError as e:
+        return {**out, "error": str(e)}
+    z = (s * xyz[~obj][inl] @ R.T + t)[:, 2]
+    out["table"] = {
+        "normal_err_deg": round(float(np.degrees(np.arccos(min((R @ n)[2], 1.0)))), 3),
+        "inliers": int(inl.sum()),
+        "z_median_mm": round(float(np.median(z)), 3),
+    }
+    try:
+        scale.run(Project(proj), {"reference_type": ref["type"]})
+    except ValueError as e:
+        return {**out, "error": str(e)}
+    res = json.loads((proj / "scale.json").read_text("utf-8"))
+    M = np.array(res["world_from_sparse"])
+    origin = s * R @ np.linalg.solve(M[:3, :3], -M[:3, 3]) + t
+    o2w = np.array(scene["object"]["object_to_world_mm"])[:3, :3]
+    long_axis = o2w[:, int(np.argmax(scene["object"]["overall_mm"]))]
+    x, lx = (R @ M[0, :3])[:2], long_axis[:2]  # angle dans le plan de la table, au signe près
+    fit = res["reference_fit"]
+    return {
+        **out,
+        "scale_err_pct": np.round((np.atleast_1d(fit["mm_per_unit"]) / s - 1) * 100, 4).tolist(),
+        "n_views": len(fit["views"]),
+        "rejected": fit["rejected"],
+        "rms_px_median": round(float(np.median([fit["rms_px"][n] for n in fit["views"]])), 4),
+        "origin_err_mm": np.round(origin - [*ref["center_mm"][:2], 0.0], 3).tolist(),
+        "reference_height_mm": res["reference_height_mm"],
+        # grand axe presque vertical (objet debout) : axe X non défini par la vérité
+        "x_axis_err_deg": round(
+            float(np.degrees(np.arccos(min(abs(x @ lx) / np.hypot(*x) / np.hypot(*lx), 1.0)))), 2
+        )
+        if np.hypot(*lx) > 0.5
+        else None,
+    }
 
 
 def summarize_3d(rows: list[dict[str, Any]], kind: str, cams: str) -> dict[str, Any]:
@@ -178,8 +210,13 @@ def summarize_3d(rows: list[dict[str, Any]], kind: str, cams: str) -> dict[str, 
         if (r["reference"] == "card") == (kind == "card") and cams in r["fit3d"]
     ]
     ok = [f for f in fs if "error" not in f]
+    plane = {}
+    if tables := [f["table"] for f in fs if "table" in f]:
+        ang = np.array([t["normal_err_deg"] for t in tables])
+        plane = {"table": {"series": len(tables), "normal_err_deg_median": round(float(np.median(ang)), 3),
+                           "below_1deg": int((ang < 1).sum())}}  # fmt: skip
     if not ok:
-        return {"series": len(fs), "ok": 0}
+        return {"series": len(fs), "ok": 0, **plane}
     err = np.array([f["scale_err_pct"] for f in ok])  # (séries, 1 ou 2)
     a = np.abs(err)
     return {
@@ -191,6 +228,7 @@ def summarize_3d(rows: list[dict[str, Any]], kind: str, cams: str) -> dict[str, 
             "mean_signed": np.round(err.mean(0), 4).tolist(),
         },
         "kept_failed": sum(len(f.get("kept_failed", [])) for f in ok),
+        **plane,
         "rejected_ok": sum(len(f.get("rejected_ok", [])) for f in ok),
     }
 
@@ -238,19 +276,23 @@ def main() -> None:
         )
     summary = {k: summarize(rows, k) for k in ("coin", "card")}
     for k in ("coin", "card"):
-        summary[k]["fit3d"] = {c: summarize_3d(rows, k, c) for c in ("exact", "ba")}
+        summary[k]["fit3d"] = {c: summarize_3d(rows, k, c) for c in ("exact", "step")}
     print("résumé :", json.dumps(summary, ensure_ascii=False))
     if a.no_save:
         return
     commit = subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"], check=False, capture_output=True, text=True, cwd=ROOT
+        ["git", "rev-parse", "--short", "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
     )
     entry = {
         "date": time.strftime("%Y-%m-%d"),
         "commit": commit.stdout.strip(),
         "method": "scale.fit_view : arête haute par rayons (silhouette côté éloigné, modèle de tranche côté caméra), "
         "masques SAM de `segment`, normale de table exacte ; puis scale.fit_circle / fit_rectangle (caméras exactes, "
-        "et caméras `ba` alignées par similitude des centres)",
+        "et étape `scale` complète : caméras `ba`, plan de table RANSAC, repère monde ; vérité par similitude des centres)",
         "params": scale.PARAMS,
         "summary": summary,
         "series": rows,
