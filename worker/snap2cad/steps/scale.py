@@ -9,7 +9,8 @@ Bords cherchés le long de rayons normaux à la forme initiale (ajustée au masq
 - côté caméra, la tranche est visible et la silhouette passe par l'arête basse, décalée vers l'extérieur par
   la tranche sombre et l'ombre de contact (≈ 1 px sur le synthétique) : on prend le bord précédent, dans une
   fenêtre bornée par l'épaisseur projetée.
-Puis (`run`) : plan de table par RANSAC (le « haut » de chaque vue), cercle ou rectangle 3D et repère monde.
+Puis (`run`) : plan de table par RANSAC (le « haut » de chaque vue), cercle ou rectangle 3D, repère monde,
+σ d'échelle (jackknife sur les vues ⊕ plancher) et contrôles de cohérence.
 Pixels en convention COLMAP (centre du pixel 0 en 0,5), comme `sparse/`.
 """
 
@@ -399,6 +400,20 @@ def _robust_views(
     return x, rms, keep
 
 
+def _jackknife(
+    residuals: Any, x: np.ndarray, keep: np.ndarray, idx: list[int], params: dict[str, Any] | None
+) -> np.ndarray:
+    """σ jackknife de x[idx] (ajustement refait sans chaque vue gardée, à partir de x). Les paramètres de taille
+    sont des logarithmes : σ relatif de l'échelle. Ne voit que la dispersion entre vues, pas un biais commun."""
+    huber = {**FIT3D, **(params or {})}["huber_px"]
+    kept = np.flatnonzero(keep)
+    subsets = [np.delete(kept, j) for j in range(len(kept))]
+    est = np.array([
+        _lm(lambda y, s=s: _huber(np.concatenate([residuals(y, i) for i in s]), huber), x)[idx] for s in subsets
+    ])  # fmt: skip
+    return np.sqrt((len(kept) - 1) * est.var(0))
+
+
 def _views_out(views: list[dict[str, Any]], rms: np.ndarray, keep: np.ndarray) -> dict[str, Any]:
     return {
         "views": [v["name"] for v, k in zip(views, keep, strict=True) if k],
@@ -440,6 +455,7 @@ def fit_circle(
         "normal": n.tolist(),
         "radius": r,
         "mm_per_unit": REFERENCES[kind]["diameter"] / (2 * r),
+        "sigma_rel": float(_jackknife(residuals, x, keep, [5], params)[0]),
         **_views_out(views, rms, keep),
     }
 
@@ -491,7 +507,10 @@ def fit_rectangle(views: list[dict[str, Any]], params: dict[str, Any] | None = N
         match(x)
         x, rms, keep = _robust_views(views, "card", residuals, x, params)
     C, R, w, h = unpack(x)
-    (long, ax), (short, _) = sorted([(w, R[:, 0]), (h, R[:, 1])], key=lambda t: -t[0])
+    sw, sh = _jackknife(residuals, x, keep, [6, 7], params)
+    (long, ax, s_long), (short, _, s_short) = sorted(
+        [(w, R[:, 0], sw), (h, R[:, 1], sh)], key=lambda t: -t[0]
+    )
     dims = REFERENCES["card"]
     return {
         "center": C.tolist(),
@@ -499,6 +518,7 @@ def fit_rectangle(views: list[dict[str, Any]], params: dict[str, Any] | None = N
         "axis_long": ax.tolist(),
         "size": [long, short],
         "mm_per_unit": [dims["width"] / long, dims["height"] / short],
+        "sigma_rel": [float(s_long), float(s_short)],
         **_views_out(views, rms, keep),
     }
 
@@ -602,19 +622,58 @@ def sparse_points(rec: pycolmap.Reconstruction, masks: Path) -> tuple[np.ndarray
 # --- Étape ------------------------------------------------------------------------------------------------------
 STEP = "scale"
 MIN_MASK_PX = 500  # masque de référence plus petit : référence absente de la photo
+# σ d'échelle = jackknife sur les vues ⊕ plancher (biais du contour commun aux vues, que le jackknife ne voit
+# pas). Plancher étalonné sur le synthétique, caméras exactes : 68 % des erreurs dans 1σ (M4-sigma.md).
+SIGMA_FLOOR_REL: dict[str, float] = {"coin": 0.0025, "card": 0.0005}
+# Contrôles de cohérence (signalés dans `scale.json`, sans échec) : limites des écarts (M4-sigma.md).
+CHECKS: dict[str, float] = {
+    "reference_height_mm": 0.2,  # face haute − épaisseur, au-dessus du plan de table
+    "reference_tilt_deg": 1.0,  # normale de la référence vs normale de la table
+    "card_sides_pct": 1.0,  # échelle du petit côté vs grand côté (biais du petit côté : jusqu'à 0,6 %)
+}
+
+
+def sigma_rel(kind: str, fit: dict[str, Any]) -> float:
+    """σ relatif de l'échelle retenue (pièce : diamètre ; carte : grand côté)."""
+    floor = SIGMA_FLOOR_REL["card" if kind == "card" else "coin"]
+    return float(np.hypot(np.atleast_1d(fit["sigma_rel"])[0], floor))
+
+
+def _check(value: float, limit: float) -> dict[str, Any]:
+    return {"value": round(float(value), 4), "limit": limit, "ok": bool(abs(value) <= limit)}
+
+
+def checks(kind: str, fit: dict[str, Any], n: np.ndarray, d: float, s: float) -> dict[str, dict[str, Any]]:
+    """Contrôles de cohérence : la référence est posée à plat sur la table (hauteur de sa face haute = son
+    épaisseur, normale parallèle à celle de la table) ; carte : les deux côtés donnent la même échelle."""
+    nr, C = np.asarray(fit["normal"]), np.asarray(fit["center"])
+    out = {
+        "reference_height_mm": _check(
+            (n @ C + d) * s - REFERENCES[kind]["thickness"], CHECKS["reference_height_mm"]
+        ),
+        "reference_tilt_deg": _check(
+            np.degrees(np.arccos(min(abs(nr @ n), 1.0))), CHECKS["reference_tilt_deg"]
+        ),
+    }
+    if kind == "card":
+        a, b = fit["mm_per_unit"]
+        out["card_sides_pct"] = _check(100 * (b / a - 1), CHECKS["card_sides_pct"])
+    return out
 
 
 def run(project: Project, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """Plan de table (points `sparse/` hors objet), arête haute de la référence par vue (« haut » donné par le
     plan), cercle ou rectangle 3D, puis repère monde. `reference_type` : par défaut celui de `segment`.
-    Sortie : `scale.json` (mm par unité `sparse/`, similitude `sparse/` → monde en mm)."""
+    Sortie : `scale.json` (mm par unité `sparse/` et son σ relatif, similitude `sparse/` → monde en mm,
+    contrôles de cohérence)."""
     p = {"reference_type": None, **(params or {})}
     root = project.root
     segment = project.data["steps"].get("segment", {}).get("params", {})
     kind = p["reference_type"] or segment.get("reference_type")
     if kind not in REFERENCES:
         raise ValueError(f"Référence inconnue : {kind} (choix : {', '.join(REFERENCES)})")
-    p = {**p, "reference_type": kind, "view": PARAMS, "fit3d": FIT3D, "table": TABLE}
+    p = {**p, "reference_type": kind, "view": PARAMS, "fit3d": FIT3D, "table": TABLE, "checks": CHECKS,
+         "sigma_floor_rel": SIGMA_FLOOR_REL}  # fmt: skip
     versions = {"snap2cad": version("snap2cad"), "pycolmap": pycolmap.__version__}
     key = project.inputs_hash(["sparse", "masks", "images"], p, versions)
     if not project.needs_run(STEP, key):
@@ -645,11 +704,16 @@ def run(project: Project, params: dict[str, Any] | None = None) -> dict[str, Any
     fit = fit_rectangle(views) if kind == "card" else fit_circle(views, kind)
     # Carte : grand côté seul (M4-fit3d : 0,04 % contre 0,29 % pour le petit côté, biaisé par le contour).
     s = float(np.atleast_1d(fit["mm_per_unit"])[0])
+    sigma = sigma_rel(kind, fit)
     C = np.asarray(fit["center"])
     dist = (xyz[~obj][inl] @ n + d) * s
+    ctl = checks(kind, fit, n, d, s)
     out = {
         "reference": {"type": kind, **REFERENCES[kind]},
         "mm_per_unit": s,
+        "sigma_rel": sigma,  # σ relatif de l'échelle (jackknife ⊕ plancher ; jackknife seul : reference_fit)
+        "checks": ctl,
+        "checks_ok": all(c["ok"] for c in ctl.values()),
         "world_frame": "table_z_up",  # Z = normale de la table, origine = référence, X = grand axe de l'objet
         "world_from_sparse": world_frame(n, d, C, xyz[obj], s).round(9).tolist(),
         "table": {
@@ -671,6 +735,12 @@ def run(project: Project, params: dict[str, Any] | None = None) -> dict[str, Any
         ["scale.json"],
         code_version=f"snap2cad {versions['snap2cad']} + pycolmap {versions['pycolmap']}",
         duration_s=round(time.perf_counter() - t0, 2),
-        result={"mm_per_unit": s, "n_views": len(fit["views"]), "table_inliers": int(inl.sum())},
+        result={
+            "mm_per_unit": s,
+            "sigma_rel": sigma,
+            "n_views": len(fit["views"]),
+            "table_inliers": int(inl.sum()),
+            "checks_ok": out["checks_ok"],
+        },
     )
     return project.data["steps"][STEP]
