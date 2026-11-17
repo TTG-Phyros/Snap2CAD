@@ -9,16 +9,25 @@ Bords cherchés le long de rayons normaux à la forme initiale (ajustée au masq
 - côté caméra, la tranche est visible et la silhouette passe par l'arête basse, décalée vers l'extérieur par
   la tranche sombre et l'ombre de contact (≈ 1 px sur le synthétique) : on prend le bord précédent, dans une
   fenêtre bornée par l'épaisseur projetée.
+Puis (`run`) : plan de table par RANSAC (le « haut » de chaque vue), cercle ou rectangle 3D et repère monde.
 Pixels en convention COLMAP (centre du pixel 0 en 0,5), comme `sparse/`.
 """
 
 from __future__ import annotations
 
+import json
+import time
+from collections import defaultdict
+from importlib.metadata import version
+from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
 import pycolmap
+from PIL import Image
+
+from snap2cad.project import Project
 
 PARAMS: dict[str, Any] = {
     "sigma_px": 1.0,  # lissage gaussien avant le gradient
@@ -492,3 +501,176 @@ def fit_rectangle(views: list[dict[str, Any]], params: dict[str, Any] | None = N
         "mm_per_unit": [dims["width"] / long, dims["height"] / short],
         **_views_out(views, rms, keep),
     }
+
+
+# --- Plan de table et repère monde ------------------------------------------------------------------------------
+TABLE: dict[str, Any] = {
+    "tol_rel": 0.003,  # seuil RANSAC : part de la distance médiane caméras → points (≈ 1 mm à 30 cm)
+    "iters": 2000,
+    "min_points": 30,  # en dessous : plan mal défini (échec)
+    "object_ratio": 0.5,  # point « objet » : plus de cette part de ses observations dans le masque objet
+}
+
+
+def table_plane(
+    xyz: np.ndarray, centers: np.ndarray, params: dict[str, Any] | None = None, seed: int = 0
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """Plan de la table (n·X + d = 0, n unitaire vers les caméras) par RANSAC sur les points `xyz` (N, 3) hors
+    objet, puis moindres carrés sur les points retenus. Plans candidats écartés s'ils passent entre les caméras
+    `centers` (M, 3) : toutes les photos sont prises au-dessus de la table. Retourne n, d, masque des points."""
+    p = {**TABLE, **(params or {})}
+    if len(xyz) < 3:
+        raise ValueError(f"trop peu de points pour le plan de table ({len(xyz)})")
+    scene = float(np.median(np.linalg.norm(xyz[None] - centers[:, None], axis=2)))
+    tol = p["tol_rel"] * scene
+    rng = np.random.default_rng(seed)
+    best, best_score = None, -1
+    for _ in range(p["iters"]):
+        a, b, c = xyz[rng.integers(len(xyz), size=3)]  # doublon : produit vectoriel nul, écarté
+        n = np.cross(b - a, c - a)
+        if (norm := np.linalg.norm(n)) < 1e-12:
+            continue
+        n /= norm
+        side = (centers - a) @ n
+        if (side > 0).any() and (side < 0).any():
+            continue
+        if (score := int((np.abs((xyz - a) @ n) < tol).sum())) > best_score:
+            best, best_score = (n, a), score
+    if best is None:
+        raise ValueError("aucun plan de table laissant toutes les caméras du même côté")
+    n, a = best
+    for _ in range(3):  # moindres carrés sur les points retenus, puis nouveaux points retenus
+        inl = np.abs((xyz - a) @ n) < tol
+        a = xyz[inl].mean(0)
+        n = np.linalg.svd(xyz[inl] - a)[2][2]
+    if inl.sum() < p["min_points"]:
+        raise ValueError(f"plan de table mal défini ({int(inl.sum())} points < {p['min_points']})")
+    n = n if np.median((centers - a) @ n) > 0 else -n
+    return n, float(-n @ a), np.abs((xyz - a) @ n) < tol
+
+
+def plane_point(view: dict[str, Any], px: np.ndarray, n: np.ndarray, d: float) -> np.ndarray:
+    """Point du plan (n, d) vu au pixel `px` (sans distorsion)."""
+    o, r = _center(view), _rays(view, np.asarray(px, np.float64)[None])[0]
+    return o - r * (n @ o + d) / (n @ r)
+
+
+def view_up(view: dict[str, Any], X: np.ndarray, n: np.ndarray) -> np.ndarray:
+    """Direction de l'image (unitaire) de la normale n en X : « haut » de la table pour `fit_view`."""
+    P = np.asarray(view["K"]) @ np.asarray(view["cam_from_world"], np.float64)
+    q, dq = P @ [*X, 1.0], P[:, :3] @ n
+    u = dq[:2] * q[2] - q[:2] * dq[2]  # dérivée de la projection le long de n
+    return u / np.linalg.norm(u)
+
+
+def world_frame(
+    n: np.ndarray, d: float, center: np.ndarray, obj_xyz: np.ndarray, mm_per_unit: float
+) -> np.ndarray:
+    """Similitude (4, 4) unités `sparse/` → mm : Z = n (vers le haut), origine = `center` (référence) projeté sur
+    la table, X = grand axe des points objet projetés sur la table, orienté vers l'objet."""
+    O = center - (n @ center + d) * n
+    x, _ = _basis(n)
+    if len(obj_xyz) >= 2:
+        q = obj_xyz - (obj_xyz - O) @ n[:, None] * n  # projection sur la table
+        x = np.linalg.svd(q - q.mean(0))[2][0]
+        x -= (x @ n) * n
+        x /= np.linalg.norm(x)
+        x = x if (q.mean(0) - O) @ x >= 0 else -x
+    R = np.stack([x, np.cross(n, x), n])  # lignes : axes monde dans le repère `sparse/`
+    M = np.eye(4)
+    M[:3, :3], M[:3, 3] = mm_per_unit * R, -mm_per_unit * R @ O
+    return M
+
+
+def sparse_points(rec: pycolmap.Reconstruction, masks: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Points 3D (N, 3) de `rec` et masque des points objet : plus de `object_ratio` de leurs observations dans
+    le masque objet (`masks/<photo>.png`)."""
+    votes: dict[int, list[bool]] = defaultdict(list)  # par point 3D : observation dans le masque objet ?
+    for im in rec.images.values():
+        if not (f := masks / f"{Path(im.name).stem}.png").is_file():
+            continue
+        mask = np.asarray(Image.open(f)) > 0
+        for o in im.get_observation_points2D():
+            x, y = np.minimum(np.asarray(o.xy, int), [mask.shape[1] - 1, mask.shape[0] - 1])
+            votes[o.point3D_id].append(bool(mask[y, x]))
+    ids = sorted(rec.points3D)
+    xyz = np.array([rec.points3D[i].xyz for i in ids]).reshape(-1, 3)
+    obj = np.array([bool(votes[i]) and np.mean(votes[i]) > TABLE["object_ratio"] for i in ids], bool)
+    return xyz, obj
+
+
+# --- Étape ------------------------------------------------------------------------------------------------------
+STEP = "scale"
+MIN_MASK_PX = 500  # masque de référence plus petit : référence absente de la photo
+
+
+def run(project: Project, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Plan de table (points `sparse/` hors objet), arête haute de la référence par vue (« haut » donné par le
+    plan), cercle ou rectangle 3D, puis repère monde. `reference_type` : par défaut celui de `segment`.
+    Sortie : `scale.json` (mm par unité `sparse/`, similitude `sparse/` → monde en mm)."""
+    p = {"reference_type": None, **(params or {})}
+    root = project.root
+    segment = project.data["steps"].get("segment", {}).get("params", {})
+    kind = p["reference_type"] or segment.get("reference_type")
+    if kind not in REFERENCES:
+        raise ValueError(f"Référence inconnue : {kind} (choix : {', '.join(REFERENCES)})")
+    p = {**p, "reference_type": kind, "view": PARAMS, "fit3d": FIT3D, "table": TABLE}
+    versions = {"snap2cad": version("snap2cad"), "pycolmap": pycolmap.__version__}
+    key = project.inputs_hash(["sparse", "masks", "images"], p, versions)
+    if not project.needs_run(STEP, key):
+        return project.data["steps"][STEP]
+
+    t0 = time.perf_counter()
+    rec = pycolmap.Reconstruction(root / "sparse")
+    images = sorted(rec.images.values(), key=lambda im: im.name)
+    xyz, obj = sparse_points(rec, root / "masks/object")
+    n, d, inl = table_plane(xyz[~obj], np.array([im.projection_center() for im in images]))
+
+    views, errors = [], {}
+    for im in images:
+        stem = Path(im.name).stem
+        f = root / "masks/reference" / f"{stem}.png"
+        mask = np.asarray(Image.open(f)) > 0 if f.is_file() else None
+        if mask is None or mask.sum() < MIN_MASK_PX:
+            continue
+        cam = rec.cameras[im.camera_id]
+        v = {"name": stem, "K": cam.calibration_matrix(), "cam_from_world": im.cam_from_world.matrix()}
+        px = undistort(cam, np.argwhere(mask)[:, ::-1].mean(0, keepdims=True) + 0.5)[0]
+        up = view_up(v, plane_point(v, px, n, d), n)
+        rgb = np.asarray(Image.open(root / "images" / im.name).convert("RGB"))
+        try:
+            views.append({**v, **fit_view(rgb, mask, cam, kind, up)})
+        except ValueError as e:
+            errors[stem] = str(e)
+    fit = fit_rectangle(views) if kind == "card" else fit_circle(views, kind)
+    # Carte : grand côté seul (M4-fit3d : 0,04 % contre 0,29 % pour le petit côté, biaisé par le contour).
+    s = float(np.atleast_1d(fit["mm_per_unit"])[0])
+    C = np.asarray(fit["center"])
+    dist = (xyz[~obj][inl] @ n + d) * s
+    out = {
+        "reference": {"type": kind, **REFERENCES[kind]},
+        "mm_per_unit": s,
+        "world_frame": "table_z_up",  # Z = normale de la table, origine = référence, X = grand axe de l'objet
+        "world_from_sparse": world_frame(n, d, C, xyz[obj], s).round(9).tolist(),
+        "table": {
+            "normal": n.tolist(),
+            "d": d,
+            "n_points": int((~obj).sum()),
+            "n_inliers": int(inl.sum()),
+            "rms_mm": round(float(np.sqrt((dist**2).mean())), 4),
+        },
+        "reference_height_mm": round(float((n @ C + d) * s), 4),  # face haute : épaisseur attendue
+        "reference_fit": fit,
+        "view_errors": errors,
+    }
+    (root / "scale.json").write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    project.record(
+        STEP,
+        key,
+        p,
+        ["scale.json"],
+        code_version=f"snap2cad {versions['snap2cad']} + pycolmap {versions['pycolmap']}",
+        duration_s=round(time.perf_counter() - t0, 2),
+        result={"mm_per_unit": s, "n_views": len(fit["views"]), "table_inliers": int(inl.sum())},
+    )
+    return project.data["steps"][STEP]
