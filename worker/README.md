@@ -18,6 +18,7 @@ export SNAP2CAD_MODELS="$(git rev-parse --show-toplevel)/models"
 ```bash
 uv run --project worker python tools/check_env.py      # contrôle de l'environnement
 uv run --project worker pytest worker                  # tests processeur
+uv run --project worker ruff check --config worker/pyproject.toml worker tools  # lint (comme la CI)
 uv run --project worker pytest worker -m gpu           # tests GPU (3060, 4060)
 uv run --project worker python tools/bench_vggt.py ... # mesures VRAM/temps (docs/benchmarks)
 uv run --project worker python -m tools.eval.poses     # erreur de rotation sur DTU / MobileBrick / synth:<série> (docs/benchmarks/poses.json)

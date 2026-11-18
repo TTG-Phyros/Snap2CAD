@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: ruff + pytest (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      # Seuls vggt et sam2 sont des dépendances du worker ; Hunyuan3D-2 et cad-recode sont lourds et inutiles ici.
+      - run: git submodule update --init --depth 1 third_party/vggt third_party/sam2
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: worker/uv.lock
+      - run: uv sync --project worker --locked
+      - run: uv run --project worker ruff check --config worker/pyproject.toml worker tools
+      # Les tests marqués gpu sont exclus par addopts ; ceux qui lisent datasets/ s'ignorent seuls.
+      - run: uv run --project worker pytest worker
