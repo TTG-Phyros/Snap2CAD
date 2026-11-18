@@ -17,9 +17,9 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image
+
 from snap2cad import device
 from snap2cad.models import birefnet
-
 from tools.eval.segment import LABELS, LOST_IOU, SYNTH, iou
 
 ROOT = Path(__file__).resolve().parents[2]
