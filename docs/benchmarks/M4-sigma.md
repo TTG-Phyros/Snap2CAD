@@ -13,10 +13,12 @@ poses `ba` (`fit3d.step`, vérité par similitude des centres des caméras).
   |erreur| / σ ≈ 1,8). On ajoute donc un plancher en quadrature : σ = √(σ_vues² + σ₀²), avec σ₀ = 0,25 %
   (pièce) et 0,05 % (carte, grand côté), choisis pour avoir ≈ 68 % des erreurs dans 1σ.
 - **Contrôles** (`scale.json` → `checks`, `checks_ok` ; signalés, sans échec de l'étape) :
-  - hauteur de la face haute au-dessus du plan de table − épaisseur de la référence : ≤ 0,2 mm ;
+  - hauteur de la face haute au-dessus du plan de table − épaisseur de la référence : ≤ 1 mm (0,2 mm avant #102,
+    section dédiée plus bas) ;
   - angle entre la normale de la référence et celle de la table : ≤ 1° ;
   - carte : échelle du petit côté vs grand côté : ≤ 1 % (biais du petit côté jusqu'à 0,57 % avec les caméras
-    exactes, [M4-fit3d.md](M4-fit3d.md)).
+    exactes, [M4-fit3d.md](M4-fit3d.md)) ;
+  - avertissements de `ba` (`ba_warnings`) : tout avertissement rend `checks_ok` faux (depuis #102).
 
 ## Résultats
 
@@ -140,16 +142,107 @@ Sur les 21 séries aux poses justes :
   avec σ = 0,95 % (dans 2σ). Le jackknife suit maintenant l'incohérence des vues : σ couvre 14 pièces sur 16
   dans 2σ, contre une médiane |erreur| / σ de 3,9 avec l'ancien `ba`.
 - Le contrôle de hauteur de la référence donne beaucoup de fausses alertes avec les poses `ba` (jusqu'à
-  −2,6 mm sur `Razer__base`, erreur −0,10 %) : 7 séries justes sur 21 seulement passent tous les contrôles. Suivi
-  dans un ticket à part.
+  −2,6 mm sur `Razer__base`, erreur −0,10 %) : 7 séries justes sur 21 seulement passent tous les contrôles.
+  Corrigé par #102 (section suivante).
 - `Ecoforms__noir` (+5,29 %) et `Caddy__noir` (+0,94 %) passent les contrôles de `scale` : seul `ba` les signale.
+
+## Contrôle de hauteur : plan de table et avertissements de `ba` (#102)
+
+Entrée `758cc4c` de [`scale.json`](scale.json), mêmes 30 séries et mêmes poses `ba` qu'en `6e542c6`.
+
+**Cause des fausses alertes.** Deux mesures pour séparer le plan de table du cercle ou rectangle 3D :
+
+- Le plan RANSAC suit les points de table proches de la référence. Leur hauteur médiane au-dessus du plan, à
+  moins de 1,5 rayon de la référence, est de −0,01 mm sur `Razer__base` et `Shurtape__base`, et de +0,06 mm sur
+  `Hammer__noir`. RANSAC n'est donc pas en cause.
+- Les points de table eux-mêmes sont trop hauts, **même avec les caméras exactes**. Retriangulés à partir des
+  mêmes observations 2D, ils sortent à z = +2,0 mm (`Razer__base`) et +2,2 mm (`Shurtape__base`) au lieu de 0. À
+  moins de 30 mm de la référence : +2,5 mm. Ce sont des points de la face haute de la pièce (épaisseur 2,2 à
+  2,3 mm). Le masque objet les classait comme table. Sur une table peu texturée, ils pèsent assez pour relever
+  le plan de l'épaisseur de la pièce : hauteur − épaisseur ≈ −2,3 mm.
+- Les écarts restants, jusqu'à 1 mm, viennent des poses `ba`. Sur `Hammer__noir`, les points de table sont à
+  +0,7 mm avec les caméras exactes et à +5,4 mm avec les poses `ba`. Le cercle 3D n'y est pour rien : avec les
+  caméras exactes, hauteur − épaisseur ≤ 0,18 mm sur les 30 séries.
+
+**Corrections.**
+
+- Le plan de table exclut les points dont la majorité des observations tombent dans le masque de la référence
+  (`sparse_points` prend plusieurs dossiers de masques).
+- La limite passe de 0,2 à **1,0 mm**. Aucun lien entre |hauteur − épaisseur| et σ, `rms_rel` ou le nombre de
+  points de table : une limite relative n'aurait rien à suivre. Avec les caméras exactes, les 30 séries passent
+  (écart max 0,18 mm pour la pièce, 0,04 mm pour la carte).
+- `scale.json` → `ba_warnings` : codes des avertissements de `ba_report.json`, pris en compte dans
+  `checks_ok`. `ba_report.json` entre dans le hash d'entrée de l'étape.
+
+**Résultats (étape complète).** « Avant » : entrée `6e542c6`.
+
+| Série | Centres (mm) | Erreur d'échelle | σ | Hauteur − épaisseur avant | après | Inclinaison | Contrôles | Avertissements `ba` |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| `Pony__base` | 0,35 | +0,15 % | 0,30 % | −0,06 | −0,06 | 0,13° | ok | — |
+| `Ecoforms__flip` | 0,41 | −0,62 % | 0,55 % | −0,37 | −0,15 | 0,78° | ok | — |
+| `OXO__noref` | 0,48 | −0,03 % | 0,10 % | +0,04 | +0,06 | 0,06° | ok | — |
+| `Razer__flip` | 0,50 | +0,08 % | 0,33 % | −0,14 | −0,13 | 0,50° | ok | — |
+| `Hammer__flip` | 0,59 | +0,31 % | 0,34 % | +0,03 | +0,05 | 0,41° | ok | — |
+| `Pony__incomplete` | 0,66 | +0,37 % | 0,33 % | −0,67 | −0,50 | 0,54° | ok | — |
+| `Caddy__base` | 0,89 | +1,17 % | 0,51 % | −1,02 | +0,09 | 0,23° | ok | — |
+| `Mug__base` | 0,89 | −0,01 % | 0,06 % | +0,08 | +0,15 | 0,04° | ok | — |
+| `Shurtape__base` | 0,96 | +1,19 % | 1,08 % | −2,54 | **+11,03** | **21,4°** | signalé | — |
+| `Razer__noir` | 1,06 | −0,01 % | 0,37 % | −2,20 | −0,44 | 0,72° | ok | — |
+| `Shurtape__incomplete` | 1,07 | +0,68 % | 0,75 % | −1,73 | −0,03 | 0,54° | ok | — |
+| `Logitech__base` | 1,08 | −0,03 % | 0,06 % | −0,51 | +0,02 | 0,05° | ok | — |
+| `Pony__noir` | 1,08 | +0,79 % | 0,48 % | −1,18 | −0,51 | 0,15° | ok | — |
+| `OXO__noir` | 1,16 | −0,10 % | 0,08 % | −0,48 | −0,48 | 0,36° | ok | — |
+| `Razer__base` | 1,21 | −0,12 % | 0,45 % | −2,60 | −0,91 | 0,92° | ok | — |
+| `Teapot__noir` | 1,35 | +0,02 % | 0,29 % | +0,02 | +0,03 | 0,22° | ok | — |
+| `Teapot__incomplete` | 1,39 | −0,33 % | 0,32 % | −0,05 | +0,04 | 0,74° | ok | — |
+| `OXO__base` | 1,40 | +0,05 % | 0,14 % | −0,56 | +0,06 | 0,62° | ok | — |
+| `Teapot__base` | 1,64 | +0,86 % | 0,69 % | +0,97 | +0,98 | **1,29°** | signalé | — |
+| `Hammer__base` | 1,95 | +1,70 % | 0,92 % | −0,56 | −0,62 | 0,77° | ok | — |
+| `Hammer__noir` | 1,96 | −0,06 % | 0,32 % | −2,04 | **−1,88** | 0,14° | signalé | — |
+| `Mug__noref` | 2,08 | −0,18 % | 0,11 % | −0,70 | **−6,87** | **3,12°** | signalé | — |
+| `Logitech__noref` | 3,05 | −0,10 % | 0,09 % | −0,76 | −0,80 | 0,21° | **ok** | — |
+| `Mug__noir` | 3,14 | −0,68 % | 0,22 % | −0,61 | −0,35 | 0,36° | signalé | weak_views |
+| `Ecoforms__base` | 3,98 | refusé | — | — | — | — | — | — |
+| `Logitech__noir` | 4,75 | +0,11 % | 0,65 % | −0,73 | −0,60 | 0,79° | **ok** | — |
+| `Caddy__noir` | 8,61 | +0,96 % | 0,28 % | +0,20 | +0,22 | 0,37° | signalé | pose_drift |
+| `Shurtape__noir` | 13,09 | +2,16 % | 0,37 % | −2,07 | +0,14 | 0,88° | signalé | weak_views, pose_drift, focal_mismatch |
+| `Caddy__incomplete` | 17,01 | refusé | — | — | — | — | — | — |
+| `Ecoforms__noir` | 33,15 | **refusé** (`rms_rel` 18 %) | — | — | — | — | — | weak_views, pose_drift |
+
+| | Avant (`6e542c6`) | Après (`758cc4c`) |
+|---|---:|---:|
+| Poses justes (centres < 2 mm) : tous contrôles ok | 7 / 21 | **18 / 21** |
+| Erreur d'échelle dans 2σ : tous contrôles ok (critère : ≥ 90 %) | — | **19 / 23 (83 %)** |
+| Poses fausses (centres ≥ 2 mm) : refusées ou signalées (critère : toutes) | 7 / 9 | **7 / 9** |
+
+- **Critère non atteint.** Ses deux moitiés se contredisent ici : `Mug__noref`, `Logitech__noref` et
+  `Logitech__noir` ont des poses fausses (2 à 4,75 mm) mais une erreur d'échelle dans 2σ (−0,18 à +0,11 %).
+  Les signaler compte comme fausse alerte dans la première moitié. Même en signalant les 9 séries aux poses
+  fausses, on plafonne à 20 / 23 (87 %).
+- Restent non signalées : `Logitech__noref` et `Logitech__noir`, avec des erreurs d'échelle de −0,10 % et +0,11 %.
+  Leur hauteur (−0,80 et −0,60 mm) se confond avec celle des séries justes (jusqu'à −0,91 mm). Il faudrait une
+  limite de 0,5 mm pour les signaler, au prix de 10 fausses alertes sur 23.
+- Fausses alertes restantes :
+  - `Hammer__noir` (−1,88 mm, centres 1,96 mm, à la limite des poses fausses) ;
+  - `Teapot__base` (inclinaison 1,29°) ;
+  - `Mug__noref` (poses fausses, signalée à raison) ;
+  - `Shurtape__base` : plan de table faux (normale à 22°).
+- **Table unie.** `Shurtape__base` et `Mug__noref` (table `plain`) n'ont presque pas de points de table hors de
+  la pièce (117 et 371 retenus). Les points de la pièce faisaient tenir le plan, à la mauvaise hauteur. Sans eux,
+  RANSAC retient un plan faux. Les contrôles le signalent, mais le « haut » des vues en dépend : l'erreur
+  d'échelle de `Shurtape__base` passe de +0,45 % à +1,19 %. Repli sur le plan de la référence : #110.
+- `Ecoforms__noir` (+5,29 % avant) est désormais refusée par le garde-fou. Le plan de table corrigé change le
+  « haut » des vues, ce qui fait ressortir l'incohérence des poses.
 
 ## Pour la décision M4
 
 - Avec les caméras exactes, le σ médian de la pièce (0,27 %) dépasse déjà la cible de 0,15 % ; celui de la
   carte (0,05 %) est sous la cible de 0,08 %.
-- Avec les poses `ba` corrigées, l'étape aboutit sur les 21 séries aux poses justes. Pièce : |erreur| médiane
-  0,38 %, 4 séries sur 16 sous 0,15 %. Carte : médiane 0,03 %, 4 sur 5 sous 0,08 % (la 5ᵉ à 0,095 %).
+- Avec les poses `ba` corrigées et le plan de table sans la référence (`758cc4c`), l'étape aboutit sur les 21
+  séries aux poses justes :
+  - pièce : |erreur| médiane 0,35 % (P90 1,18 %, max 1,70 %), 5 séries sur 16 sous 0,15 %, 15 sur 16 dans 2σ ;
+  - carte : médiane 0,03 %, 4 sur 5 sous 0,08 % (la 5ᵉ à 0,10 %).
+  
   Ces chiffres servent de base à la décision (#51).
 
 ## Suites

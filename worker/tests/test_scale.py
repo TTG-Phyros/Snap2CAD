@@ -151,7 +151,7 @@ def test_fit_circle_sigma_and_checks():
     ok = scale.checks("coin2", fit, np.array([0.0, 0, 1]), 0.0, s)
     assert all(c["ok"] for c in ok.values()), ok
     assert abs(ok["reference_height_mm"]["value"]) < 0.05
-    tilted = scale.checks("coin2", fit, np.array([np.sin(0.1), 0, np.cos(0.1)]), 1.0 * unit, s)  # 5,7°, 1 mm
+    tilted = scale.checks("coin2", fit, np.array([np.sin(0.1), 0, np.cos(0.1)]), 2.0 * unit, s)  # 5,7°, 2 mm
     assert not tilted["reference_tilt_deg"]["ok"] and not tilted["reference_height_mm"]["ok"], tilted
 
 
@@ -190,6 +190,34 @@ def test_table_plane_ignores_box_top_and_wall():
     assert n[2] > 0.9999, n  # vers les caméras
     assert abs(d) < 0.3 * unit, d
     assert inl[:800].mean() > 0.95 and inl[800:1100].sum() == 0
+
+
+def test_sparse_points_object_and_reference(tmp_path):
+    """Points vus dans le masque objet, dans le masque référence (exclus du plan de table, #102), ou sur la table."""
+    from PIL import Image
+
+    rec = pycolmap.Reconstruction()
+    rec.add_camera(
+        pycolmap.Camera(model="SIMPLE_PINHOLE", width=40, height=20, params=[50.0, 20, 10], camera_id=1)
+    )
+    pts = [(5.0, 5.0), (30.0, 5.0), (20.0, 15.0)]  # objet, référence, table
+    im = pycolmap.Image(name="a.jpg", camera_id=1, image_id=1,
+                        points2D=pycolmap.ListPoint2D([pycolmap.Point2D(np.array(p)) for p in pts]))  # fmt: skip
+    im.cam_from_world = pycolmap.Rigid3d()
+    rec.add_image(im)
+    for k in range(3):
+        track = pycolmap.Track()
+        track.add_element(1, k)
+        rec.add_point3D(np.array([k, 0.0, 1.0]), track)
+    for name, box in (("object", (slice(0, 10), slice(0, 10))), ("reference", (slice(0, 10), slice(25, 35)))):
+        m = np.zeros((20, 40), np.uint8)
+        m[box] = 255
+        (tmp_path / name).mkdir()
+        Image.fromarray(m).save(tmp_path / name / "a.png")
+    xyz, obj, ref = scale.sparse_points(rec, tmp_path / "object", tmp_path / "reference")
+    assert xyz.shape == (3, 3)
+    assert obj.tolist() == [True, False, False] and ref.tolist() == [False, True, False]
+    assert len(scale.sparse_points(rec, tmp_path / "object")) == 2  # appel historique : (xyz, obj)
 
 
 def test_view_up_is_projected_normal():

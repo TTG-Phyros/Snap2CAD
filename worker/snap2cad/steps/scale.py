@@ -627,21 +627,25 @@ def world_frame(
     return M
 
 
-def sparse_points(rec: pycolmap.Reconstruction, masks: Path) -> tuple[np.ndarray, np.ndarray]:
-    """Points 3D (N, 3) de `rec` et masque des points objet : plus de `object_ratio` de leurs observations dans
-    le masque objet (`masks/<photo>.png`)."""
-    votes: dict[int, list[bool]] = defaultdict(list)  # par point 3D : observation dans le masque objet ?
-    for im in rec.images.values():
-        if not (f := masks / f"{Path(im.name).stem}.png").is_file():
-            continue
-        mask = np.asarray(Image.open(f)) > 0
-        for o in im.get_observation_points2D():
-            x, y = np.minimum(np.asarray(o.xy, int), [mask.shape[1] - 1, mask.shape[0] - 1])
-            votes[o.point3D_id].append(bool(mask[y, x]))
+def sparse_points(rec: pycolmap.Reconstruction, *masks: Path) -> tuple[np.ndarray, ...]:
+    """Points 3D (N, 3) de `rec`, puis par dossier de masques (`<dossier>/<photo>.png`) le masque des points
+    dont plus de `object_ratio` des observations tombent dans ce masque (objet, référence)."""
     ids = sorted(rec.points3D)
     xyz = np.array([rec.points3D[i].xyz for i in ids]).reshape(-1, 3)
-    obj = np.array([bool(votes[i]) and np.mean(votes[i]) > TABLE["object_ratio"] for i in ids], bool)
-    return xyz, obj
+    out = [xyz]
+    for d in masks:
+        votes: dict[int, list[bool]] = defaultdict(list)  # par point 3D : observation dans le masque ?
+        for im in rec.images.values():
+            if not (f := d / f"{Path(im.name).stem}.png").is_file():
+                continue
+            mask = np.asarray(Image.open(f)) > 0
+            for o in im.get_observation_points2D():
+                x, y = np.minimum(np.asarray(o.xy, int), [mask.shape[1] - 1, mask.shape[0] - 1])
+                votes[o.point3D_id].append(bool(mask[y, x]))
+        out.append(
+            np.array([bool(votes[i]) and np.mean(votes[i]) > TABLE["object_ratio"] for i in ids], bool)
+        )
+    return tuple(out)
 
 
 # --- Étape ------------------------------------------------------------------------------------------------------
@@ -652,7 +656,9 @@ MIN_MASK_PX = 500  # masque de référence plus petit : référence absente de l
 SIGMA_FLOOR_REL: dict[str, float] = {"coin": 0.0025, "card": 0.0005}
 # Contrôles de cohérence (signalés dans `scale.json`, sans échec) : limites des écarts (M4-sigma.md).
 CHECKS: dict[str, float] = {
-    "reference_height_mm": 0.2,  # face haute − épaisseur, au-dessus du plan de table
+    # Face haute − épaisseur, au-dessus du plan de table. Poses `ba` justes (centres < 2 mm) : jusqu'à 1 mm (erreur de
+    # pose commune au plan et à la référence, sans lien avec σ) ; 0,2 mm avec les caméras exactes (M4-sigma.md, #102).
+    "reference_height_mm": 1.0,
     "reference_tilt_deg": 1.0,  # normale de la référence vs normale de la table
     "card_sides_pct": 1.0,  # échelle du petit côté vs grand côté (biais du petit côté : jusqu'à 0,6 %)
 }
@@ -687,10 +693,10 @@ def checks(kind: str, fit: dict[str, Any], n: np.ndarray, d: float, s: float) ->
 
 
 def run(project: Project, params: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Plan de table (points `sparse/` hors objet), arête haute de la référence par vue (« haut » donné par le
-    plan), cercle ou rectangle 3D, puis repère monde. `reference_type` : par défaut celui de `segment`.
+    """Plan de table (points `sparse/` hors objet et hors référence), arête haute de la référence par vue (« haut »
+    donné par le plan), cercle ou rectangle 3D, puis repère monde. `reference_type` : par défaut celui de `segment`.
     Sortie : `scale.json` (mm par unité `sparse/` et son σ relatif, similitude `sparse/` → monde en mm,
-    contrôles de cohérence)."""
+    contrôles de cohérence, avertissements de `ba`)."""
     p = {"reference_type": None, **(params or {})}
     root = project.root
     segment = project.data["steps"].get("segment", {}).get("params", {})
@@ -700,15 +706,19 @@ def run(project: Project, params: dict[str, Any] | None = None) -> dict[str, Any
     p = {**p, "reference_type": kind, "view": PARAMS, "fit3d": FIT3D, "table": TABLE, "checks": CHECKS,
          "sigma_floor_rel": SIGMA_FLOOR_REL}  # fmt: skip
     versions = {"snap2cad": version("snap2cad"), "pycolmap": pycolmap.__version__}
-    key = project.inputs_hash(["sparse", "masks", "images"], p, versions)
+    ba_report = root / "ba_report.json"
+    inputs = ["sparse", "masks", "images", *(["ba_report.json"] if ba_report.is_file() else [])]
+    key = project.inputs_hash(inputs, p, versions)
     if not project.needs_run(STEP, key):
         return project.data["steps"][STEP]
 
     t0 = time.perf_counter()
     rec = pycolmap.Reconstruction(root / "sparse")
     images = sorted(rec.images.values(), key=lambda im: im.name)
-    xyz, obj = sparse_points(rec, root / "masks/object")
-    n, d, inl = table_plane(xyz[~obj], np.array([im.projection_center() for im in images]))
+    # Table : ni objet ni référence (points sur la face haute de la pièce : plan relevé de son épaisseur, #102).
+    xyz, obj, ref = sparse_points(rec, root / "masks/object", root / "masks/reference")
+    table = ~(obj | ref)
+    n, d, inl = table_plane(xyz[table], np.array([im.projection_center() for im in images]))
 
     views, errors = [], {}
     for im in images:
@@ -731,20 +741,24 @@ def run(project: Project, params: dict[str, Any] | None = None) -> dict[str, Any
     s = float(np.atleast_1d(fit["mm_per_unit"])[0])
     sigma = sigma_rel(kind, fit)
     C = np.asarray(fit["center"])
-    dist = (xyz[~obj][inl] @ n + d) * s
+    dist = (xyz[table][inl] @ n + d) * s
     ctl = checks(kind, fit, n, d, s)
+    # Poses fausses mais cohérentes entre elles (similitude) : invisibles ici, seuls les contrôles de `ba` les voient.
+    ba = json.loads(ba_report.read_text("utf-8")) if ba_report.is_file() else {}
+    ba_warnings = [c["code"] for c in ba.get("checks", []) if c.get("level") == "warning"]
     out = {
         "reference": {"type": kind, **REFERENCES[kind]},
         "mm_per_unit": s,
         "sigma_rel": sigma,  # σ relatif de l'échelle (jackknife ⊕ plancher ; jackknife seul : reference_fit)
         "checks": ctl,
-        "checks_ok": all(c["ok"] for c in ctl.values()),
+        "ba_warnings": ba_warnings,  # avertissements de `ba_report.json` (pose_drift, weak_views…)
+        "checks_ok": all(c["ok"] for c in ctl.values()) and not ba_warnings,
         "world_frame": "table_z_up",  # Z = normale de la table, origine = référence, X = grand axe de l'objet
         "world_from_sparse": world_frame(n, d, C, xyz[obj], s).round(9).tolist(),
         "table": {
             "normal": n.tolist(),
             "d": d,
-            "n_points": int((~obj).sum()),
+            "n_points": int(table.sum()),
             "n_inliers": int(inl.sum()),
             "rms_mm": round(float(np.sqrt((dist**2).mean())), 4),
         },

@@ -169,7 +169,8 @@ def step(proj: Path, scene: dict[str, Any], cams: dict[str, Any]) -> dict[str, A
     names = [Path(im.name).stem for im in rec.images.values()]
     src = np.array([im.projection_center() for im in rec.images.values()])
     s, R, t = metrics.umeyama(src, metrics.camera_centers(np.array([cams[n][0] for n in names])))
-    xyz, obj = scale.sparse_points(rec, proj / "masks/object")
+    xyz, obj, on_ref = scale.sparse_points(rec, proj / "masks/object", proj / "masks/reference")
+    table = ~(obj | on_ref)
     ba = json.loads((proj / "ba_report.json").read_text("utf-8")) if (proj / "ba_report.json").is_file() else {}
     out: dict[str, Any] = {
         "n_points": len(xyz),
@@ -179,10 +180,10 @@ def step(proj: Path, scene: dict[str, Any], cams: dict[str, Any]) -> dict[str, A
         "ba_checks": [c["code"] for c in ba.get("checks", [])],  # avertissements de `ba` (pose_drift…)
     }  # fmt: skip
     try:
-        n, _, inl = scale.table_plane(xyz[~obj], src)
+        n, _, inl = scale.table_plane(xyz[table], src)
     except ValueError as e:
         return {**out, "error": str(e)}
-    z = (s * xyz[~obj][inl] @ R.T + t)[:, 2]
+    z = (s * xyz[table][inl] @ R.T + t)[:, 2]
     out["table"] = {
         "normal_err_deg": round(float(np.degrees(np.arccos(min((R @ n)[2], 1.0)))), 3),
         "inliers": int(inl.sum()),
@@ -239,7 +240,7 @@ def summarize_3d(rows: list[dict[str, Any]], kind: str, cams: str) -> dict[str, 
     a = np.abs(err)
     z = a[:, 0] / np.maximum([f["sigma_rel_pct"][0] for f in ok], 1e-9)  # échelle retenue : |erreur| / σ
     lim = scale.CHECKS
-    passed = [all(abs(v) <= lim[k] for k, v in f["checks"].items()) for f in ok]
+    passed = [all(abs(v) <= lim[k] for k, v in f["checks"].items()) and not f.get("ba_checks") for f in ok]
     return {
         "series": len(fs),
         "ok": len(ok),
@@ -323,8 +324,10 @@ def main() -> None:
         "commit": commit.stdout.strip(),
         "method": "scale.fit_view : arête haute par rayons (silhouette côté éloigné, modèle de tranche côté caméra), "
         "masques SAM de `segment`, normale de table exacte ; puis scale.fit_circle / fit_rectangle (caméras exactes, "
-        "et étape `scale` complète : caméras `ba`, plan de table RANSAC, repère monde ; vérité par similitude des centres) ; "
-        "σ d'échelle par jackknife sur les vues et contrôles de cohérence (hauteur, inclinaison, côtés de la carte)",
+        "et étape `scale` complète : caméras `ba`, plan de table RANSAC hors objet et hors référence, repère monde ; vérité par "
+        "similitude des centres) ; "
+        "σ d'échelle par jackknife sur les vues et contrôles de cohérence (hauteur, inclinaison, côtés de la carte, "
+        "avertissements de `ba`)",
         "params": scale.PARAMS,
         "summary": summary,
         "series": rows,
